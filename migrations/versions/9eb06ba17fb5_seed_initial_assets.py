@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 ASSETS = [
     {"name": "ASML Holding N.V.", "symbol": "ASML", "asset_type": "stock"},
-    {"name": "Adobe Inc.", "symbol": "ADBD", "asset_type": "stock"},
+    {"name": "Adobe Inc.", "symbol": "ADBE", "asset_type": "stock"},
     {"name": "Bitcoin", "symbol": "BTCUSD", "asset_type": "crypto"},
 ]
 
@@ -40,4 +40,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.execute("DELETE FROM assets WHERE symbol IN ('ASML', 'ADBD', 'BTCUSD')")
+    op.execute("DELETE FROM assets WHERE symbol IN ('ASML', 'ADBE', 'BTCUSD')")

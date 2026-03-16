@@ -32,7 +32,3 @@ class AssetNewsItem(SQLModel, table=True):
 
     def get_content(self) -> AssetNewsContent:
         return AssetNewsContent.model_validate(self.content)
-
-    @staticmethod
-    def from_content(asset_id: UUID, content: AssetNewsContent) -> "AssetNewsItem":
-        return AssetNewsItem(asset_id=asset_id, content=content.model_dump())
