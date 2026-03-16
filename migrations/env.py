@@ -1,21 +1,14 @@
 from logging.config import fileConfig
-import os
-
 from sqlalchemy import create_engine
 from sqlalchemy import pool
 from sqlmodel import SQLModel
-
-from dotenv import load_dotenv
+from app.env import DATABASE_URL
 from alembic import context
+
+# Import your models here to ensure they are registered with SQLModel's metadata
 from app.models.asset import Asset  # noqa: F401
 from app.models.asset_news import AssetNewsItem  # noqa: F401
 
-load_dotenv()
-
-DATABASE_URL = (
-    f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
-    f"@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
-)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
