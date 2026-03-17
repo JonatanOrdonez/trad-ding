@@ -5,7 +5,7 @@ from app.services import analysis
 router = APIRouter()
 
 
-@router.get("/predictions/{symbol}")
+@router.get("/predicts/{symbol}")
 async def predict_asset(symbol: str):
     try:
         result = await asyncio.to_thread(analysis.analyze_asset, symbol)
