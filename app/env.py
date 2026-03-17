@@ -27,3 +27,5 @@ DB_HOST = loadString("DB_HOST")
 DB_PORT = loadNumber("DB_PORT")
 DB_NAME = loadString("DB_NAME")
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+NEWS_API_KEY = loadString("NEWS_API_KEY")
