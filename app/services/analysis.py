@@ -1,5 +1,6 @@
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from groq import Groq
 from app.db import get_session
 from app.env import GROQ_API_KEY
@@ -61,8 +62,11 @@ def analyze_asset(symbol: str) -> AssetAnalysis:
     finally:
         session.close()
 
-    general_news = get_news_by_asset(limit=10)
-    asset_news = get_news_by_asset(symbol, limit=10)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_general = executor.submit(get_news_by_asset, None, 0, 5)
+        future_asset = executor.submit(get_news_by_asset, symbol, 0, 5)
+        general_news = future_general.result()
+        asset_news = future_asset.result()
 
     general_news_text = (
         "\n---\n".join(item.summary for item in general_news)
@@ -73,7 +77,7 @@ def analyze_asset(symbol: str) -> AssetAnalysis:
         or "No specific news available for this asset."
     )
 
-    client = Groq(api_key=GROQ_API_KEY)
+    client = Groq(api_key=GROQ_API_KEY, timeout=30.0)
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[

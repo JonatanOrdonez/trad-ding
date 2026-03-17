@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from app.services import analysis
 
@@ -5,9 +6,9 @@ router = APIRouter()
 
 
 @router.get("/predictions/{symbol}")
-def get_asset_analysis(symbol: str):
+async def get_asset_analysis(symbol: str):
     try:
-        result = analysis.analyze_asset(symbol)
+        result = await asyncio.to_thread(analysis.analyze_asset, symbol)
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
