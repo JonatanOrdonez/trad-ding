@@ -24,6 +24,7 @@ class Asset(SQLModel, table=True):
     symbol: str
     name: str
     asset_type: AssetType
+    yfinance_symbol: str
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"server_default": text("now()")},

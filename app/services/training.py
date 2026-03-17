@@ -2,7 +2,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 import modal
-from app.config import get_yfinance_symbol
+import yfinance as yf
 from app.db import get_session
 from app.repositories import assets as assets_repository
 from app.repositories import asset_models as asset_models_repository
@@ -19,11 +19,20 @@ def train_asset(symbol: str) -> dict:
             raise ValueError(f"Asset with symbol {symbol} not found")
 
         existing_model = asset_models_repository.get_active_model(session, asset.id)
+    finally:
+        session.close()
 
-        logger.info(f"Dispatching training for {symbol} to Modal")
-        train_fn = modal.Function.from_name("trad-ding-training", "train")
-        result = train_fn.remote(symbol, get_yfinance_symbol(symbol))
+    logger.info(f"Fetching historical data for {symbol}")
+    df = yf.Ticker(asset.yfinance_symbol).history(period="1y")
+    df.dropna(inplace=True)
+    records = df.reset_index().to_dict(orient="records")
 
+    logger.info(f"Dispatching training for {symbol} to Modal")
+    train_fn = modal.Function.from_name("trad-ding-training", "train")
+    result = train_fn.remote(symbol, records)
+
+    session = get_session()
+    try:
         roc_auc = result["metrics"]["roc_auc"]
 
         if existing_model is None:

@@ -2,7 +2,6 @@ import logging
 import numpy as np
 import yfinance as yf
 import onnxruntime as rt
-from app.config import get_yfinance_symbol
 from app.db import get_session
 from app.supabase import get_supabase
 from app.repositories import assets as assets_repository
@@ -40,7 +39,7 @@ def predict_asset(symbol: str) -> AssetPrediction:
     logger.info(f"Downloading model for {symbol} from {storage_path}")
     sess = _download_model(storage_path)
 
-    ticker = yf.Ticker(get_yfinance_symbol(symbol))
+    ticker = yf.Ticker(asset.yfinance_symbol)
     df = ticker.history(period="60d")
     df = build_features(df)
 

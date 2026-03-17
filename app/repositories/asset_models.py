@@ -25,6 +25,17 @@ def deactivate_models(session: Session, asset_id: UUID) -> None:
     session.commit()
 
 
+def get_all_models(session: Session, asset_id: UUID) -> list[AssetModel]:
+    return list(session.exec(select(AssetModel).where(AssetModel.asset_id == asset_id)).all())
+
+
+def delete_models_by_asset_id(session: Session, asset_id: UUID) -> None:
+    models = session.exec(select(AssetModel).where(AssetModel.asset_id == asset_id)).all()
+    for model in models:
+        session.delete(model)
+    session.commit()
+
+
 def create_asset_model(
     session: Session,
     asset_id: UUID,

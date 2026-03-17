@@ -40,6 +40,15 @@ def get_general_news(
     return list(results.all())
 
 
+def delete_news_by_asset_id(session: Session, asset_id: UUID) -> None:
+    items = session.exec(
+        select(AssetNewsItem).where(AssetNewsItem.asset_id == asset_id)
+    ).all()
+    for item in items:
+        session.delete(item)
+    session.commit()
+
+
 def create_asset_news_item(
     session: Session,
     asset_id: UUID | None,

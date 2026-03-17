@@ -8,7 +8,6 @@ image = (
         "xgboost",
         "scikit-learn",
         "pandas",
-        "yfinance",
         "supabase",
         "numpy",
     )
@@ -23,12 +22,12 @@ BUCKET = "ml-models"
     secrets=[modal.Secret.from_dotenv()],
     timeout=300,
 )
-def train(symbol: str, yfinance_symbol: str) -> dict:
+def train(symbol: str, records: list[dict]) -> dict:
     import os
     import sys
     from datetime import datetime, timezone
 
-    import yfinance as yf
+    import pandas as pd
     from sklearn.metrics import roc_auc_score
     from sklearn.model_selection import train_test_split
     from supabase import create_client
@@ -37,9 +36,7 @@ def train(symbol: str, yfinance_symbol: str) -> dict:
     sys.path.insert(0, "/root")
     from features import FEATURES, build_features, compute_balanced_accuracy
 
-    ticker = yf.Ticker(yfinance_symbol)
-    df = ticker.history(period="1y")
-    df.dropna(inplace=True)
+    df = pd.DataFrame(records)
     df = build_features(df)
 
     if len(df) < 50:

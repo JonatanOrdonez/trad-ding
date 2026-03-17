@@ -7,55 +7,78 @@ from app.env import GROQ_API_KEY
 from app.repositories import assets as assets_repository
 from app.services.news import get_news_by_asset
 from app.services.prediction import predict_asset
+from app.services.training import train_asset
 from app.types.analysis import AssetAnalysis
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """You are an expert financial analyst and active investor. Your job is to analyze
-news articles about a company and the general market to provide a clear, insightful investment
-sentiment analysis. Explain complex financial concepts as if talking to someone with no investment
-background, while still being rigorous and data-driven.
+_SYSTEM_PROMPT = """You are an expert financial analyst combining two independent signals to produce \
+actionable investment analysis:
+
+1. FUNDAMENTAL / SENTIMENT signal — derived from recent news articles about the asset and the \
+broader market. This reflects narratives, macro trends, earnings, and public perception.
+
+2. TECHNICAL signal — produced by a trained XGBoost model using short-term price indicators \
+(SMA-7, SMA-20, RSI-14, MACD, volume change). It predicts whether the next closing price will \
+be higher or lower. Its quality is measured by ROC AUC (0.5 = random, 1.0 = perfect).
+
+Your job is to weigh both signals together and produce a clear, honest recommendation. When the \
+signals agree, conviction should be higher. When they conflict, explain why and lean toward the \
+stronger or more reliable one. Write for someone with no investment background — be plain, direct, \
+and avoid jargon.
 
 You must respond exclusively with a valid JSON object. Do not include any text outside the JSON."""
 
-_USER_PROMPT_TEMPLATE = """Analyze the following information for {symbol} and provide an investment sentiment analysis.
+_USER_PROMPT_TEMPLATE = """Analyze the following information for {symbol}.
 
-GENERAL MARKET NEWS:
+--- GENERAL MARKET NEWS ---
 {general_news}
 
-NEWS SPECIFIC TO {symbol}:
+--- NEWS SPECIFIC TO {symbol} ---
 {asset_news}
 
-ML MODEL PREDICTION:
-The trained XGBoost model predicts: {model_signal} with {model_confidence:.0%} confidence.
-Model performance metrics: accuracy={model_accuracy}, roc_auc={model_roc_auc}.
+--- TECHNICAL ML SIGNAL ---
+Model prediction (next closing price direction): {model_signal}
+Confidence: {model_confidence:.0%}
+Model quality — balanced accuracy: {model_balanced_accuracy}, ROC AUC: {model_roc_auc}
+(ROC AUC above 0.6 is reliable; below 0.55 should be treated with caution.)
 
-Based on all of the above, respond with a JSON object with exactly these fields:
+Respond with a JSON object with exactly these fields:
 {{
   "sentiment": "bullish" | "bearish" | "neutral",
   "score": float between -1.0 and 1.0,
-  "score_interpretation": "one sentence explaining what the score means for this asset",
-  "summary": "2-3 paragraph plain-English explanation of the current situation, what the company does, and what the news suggests about its near-term outlook",
-  "growth_signals": ["list of positive growth indicators found in the news"],
-  "risks": ["list of specific risks mentioned or implied in the news for this company"],
-  "competitors_mentioned": ["list of competitors mentioned in the news, empty list if none"],
-  "monitor": ["list of key factors an investor should watch closely based on these news"],
+  "score_interpretation": "one sentence explaining what the score means for this asset right now",
+  "summary": "2-3 paragraphs: what this asset is, what the news says, and what the technical model suggests",
+  "growth_signals": ["specific positive indicators found in the news or technicals"],
+  "risks": ["specific risks mentioned or implied for this asset"],
+  "competitors_mentioned": ["competitors named in the news, empty list if none"],
+  "monitor": ["key factors to watch in the coming days"],
   "action": "BUY" | "SELL" | "HOLD",
-  "recommendation": "one paragraph explaining the final recommendation combining news sentiment and the ML model signal"
+  "recommendation": "one paragraph combining both signals into a final recommendation, noting where they agree or conflict"
 }}"""
 
 
 def _safe_predict(symbol: str) -> dict | None:
     try:
         result = predict_asset(symbol)
-        return {
-            "signal": result.signal,
-            "confidence": result.confidence,
-            "accuracy": result.metrics.get("accuracy", 0),
-            "roc_auc": result.metrics.get("roc_auc", 0),
-        }
-    except Exception:
+    except ValueError:
+        logger.info(f"No model found for {symbol}, triggering training before prediction")
+        try:
+            train_asset(symbol)
+            result = predict_asset(symbol)
+        except Exception as e:
+            logger.error(f"Training or prediction failed for {symbol}: {e}")
+            return None
+    except Exception as e:
+        logger.error(f"Prediction failed for {symbol}: {e}")
         return None
+
+    return {
+        "signal": result.signal,
+        "confidence": result.confidence,
+        "balanced_accuracy": result.metrics.get("balanced_accuracy", 0),
+        "roc_auc": result.metrics.get("roc_auc", 0),
+    }
 
 
 def _score_to_interpretation(score: float) -> str:
@@ -111,12 +134,8 @@ def analyze_asset(symbol: str) -> AssetAnalysis:
                     general_news=general_news_text,
                     asset_news=asset_news_text,
                     model_signal=ml_prediction["signal"] if ml_prediction else "N/A",
-                    model_confidence=(
-                        ml_prediction["confidence"] if ml_prediction else 0
-                    ),
-                    model_accuracy=(
-                        ml_prediction["accuracy"] if ml_prediction else "N/A"
-                    ),
+                    model_confidence=ml_prediction["confidence"] if ml_prediction else 0,
+                    model_balanced_accuracy=ml_prediction["balanced_accuracy"] if ml_prediction else "N/A",
                     model_roc_auc=ml_prediction["roc_auc"] if ml_prediction else "N/A",
                 ),
             },

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse
 from app.db import get_session
 from app.repositories import assets as assets_repository
 
@@ -6,12 +7,15 @@ router = APIRouter()
 
 
 @router.get("/health")
-def root():
+def health():
     return {"status": "OK"}
 
 
 @router.get("/")
-@router.get("/docs")
+def index():
+    return FileResponse("app/static/index.html")
+
+
 @router.get("/summary")
 def summary(request: Request):
     session = get_session()

@@ -5,7 +5,6 @@ import yfinance as yf
 logger = logging.getLogger(__name__)
 from newsapi import NewsApiClient
 from sqlmodel import Session
-from app.config import get_yfinance_symbol
 from app.db import get_session
 from app.env import NEWS_API_KEY
 from app.models.asset import Asset
@@ -15,15 +14,15 @@ from app.repositories import asset_news as asset_news_repository
 from app.types.news import AssetNewsResult
 
 
-def _get_news_by_asset(asset_symbol: str) -> list[dict]:
-    return yf.Ticker(get_yfinance_symbol(asset_symbol)).news
+def _get_news_by_asset(asset: Asset) -> list[dict]:
+    return yf.Ticker(asset.yfinance_symbol).news
 
 
 def _update_news_by_asset(session: Session, asset: Asset, news: list[dict]) -> None:
     for news_item in news:
-        content_id = news_item["id"]
+        content_id = news_item.get("id") or news_item.get("uuid")
 
-        if content_id is None:
+        if not content_id:
             logger.warning(f"News item for asset {asset.id} is missing an id, skipping")
             continue
 
@@ -35,11 +34,7 @@ def _update_news_by_asset(session: Session, asset: Asset, news: list[dict]) -> N
             logger.debug(f"asset_item {content_id} already exists, skipping")
             continue
 
-        content = news_item["content"]
-
-        if content is None:
-            logger.warning(f"News item for asset {asset.id} is missing content, skipping")
-            continue
+        content = news_item.get("content") or news_item
 
         asset_news_repository.create_asset_news_item(
             session,
@@ -53,7 +48,7 @@ def _update_news_by_asset(session: Session, asset: Asset, news: list[dict]) -> N
 def _sync_news_by_asset_threadsafe(asset: Asset) -> None:
     session = get_session()
     try:
-        news = _get_news_by_asset(asset.symbol)
+        news = _get_news_by_asset(asset)
         _update_news_by_asset(session, asset, news)
     finally:
         session.close()
@@ -109,6 +104,10 @@ def get_news_by_asset(
             if asset is None:
                 raise ValueError(f"Asset with symbol {symbol} not found")
             news_items = asset_news_repository.get_news_by_asset_id(session, asset.id, offset, limit)
+            if not news_items:
+                logger.info(f"No news found for {symbol}, fetching from yfinance")
+                _sync_news_by_asset_threadsafe(asset)
+                news_items = asset_news_repository.get_news_by_asset_id(session, asset.id, offset, limit)
 
         return [
             AssetNewsResult(
