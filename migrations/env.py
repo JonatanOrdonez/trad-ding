@@ -8,6 +8,7 @@ from alembic import context
 # Import your models here to ensure they are registered with SQLModel's metadata
 from app.models.asset import Asset  # noqa: F401
 from app.models.asset_news import AssetNewsItem  # noqa: F401
+from app.models.asset_model import AssetModel  # noqa: F401
 
 
 # this is the Alembic Config object, which provides

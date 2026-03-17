@@ -12,3 +12,5 @@ class AssetAnalysis:
     risks: list[str]
     competitors_mentioned: list[str]
     monitor: list[str]
+    action: str
+    recommendation: str

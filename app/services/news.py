@@ -5,6 +5,7 @@ import yfinance as yf
 logger = logging.getLogger(__name__)
 from newsapi import NewsApiClient
 from sqlmodel import Session
+from app.config import get_yfinance_symbol
 from app.db import get_session
 from app.env import NEWS_API_KEY
 from app.models.asset import Asset
@@ -15,7 +16,7 @@ from app.types.news import AssetNewsResult
 
 
 def _get_news_by_asset(asset_symbol: str) -> list[dict]:
-    return yf.Ticker(asset_symbol).news
+    return yf.Ticker(get_yfinance_symbol(asset_symbol)).news
 
 
 def _update_news_by_asset(session: Session, asset: Asset, news: list[dict]) -> None:
