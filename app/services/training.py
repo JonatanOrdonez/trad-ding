@@ -1,5 +1,6 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone, timedelta
 import modal
 from app.config import get_yfinance_symbol
 from app.db import get_session
@@ -23,11 +24,17 @@ def train_asset(symbol: str) -> dict:
         train_fn = modal.Function.from_name("trad-ding-training", "train")
         result = train_fn.remote(symbol, get_yfinance_symbol(symbol))
 
-        balanced_accuracy = result["metrics"]["balanced_accuracy"]
-        has_no_model = existing_model is None
-        improved = balanced_accuracy > 0.5
+        roc_auc = result["metrics"]["roc_auc"]
 
-        if not has_no_model and not improved:
+        if existing_model is None:
+            should_save = True
+        else:
+            existing_roc_auc = existing_model.metrics.get("roc_auc", 0)
+            improved = roc_auc > existing_roc_auc
+            stale = datetime.now(timezone.utc) - existing_model.trained_at.replace(tzinfo=timezone.utc) > timedelta(days=5)
+            should_save = improved or stale
+
+        if not should_save:
             return {"improved": False, "metrics": result.get("metrics", {})}
 
         asset_models_repository.deactivate_models(session, asset.id)
