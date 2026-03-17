@@ -1,5 +1,6 @@
 from uuid import UUID
 from sqlmodel import Session, select
+from sqlalchemy import desc
 from app.models.asset_news import AssetNewsItem, SourceType
 
 
@@ -17,6 +18,7 @@ def get_news_by_asset_id(
     statement = (
         select(AssetNewsItem)
         .where(AssetNewsItem.asset_id == asset_id)
+        .order_by(desc(AssetNewsItem.created_at))
         .offset(offset)
         .limit(limit)
     )
@@ -30,6 +32,7 @@ def get_general_news(
     statement = (
         select(AssetNewsItem)
         .where(AssetNewsItem.asset_id == None)  # noqa: E711
+        .order_by(desc(AssetNewsItem.created_at))
         .offset(offset)
         .limit(limit)
     )

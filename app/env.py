@@ -29,3 +29,4 @@ DB_NAME = loadString("DB_NAME")
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 NEWS_API_KEY = loadString("NEWS_API_KEY")
+GROQ_API_KEY = loadString("GROQ_API_KEY")
