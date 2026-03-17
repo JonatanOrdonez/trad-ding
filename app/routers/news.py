@@ -26,6 +26,4 @@ def get_news_by_asset(
         news_items = news.get_news_by_asset(symbol, offset, limit)
         return {"news": news_items}
     except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Error during news synchronization: {e}"
-        )
+        raise HTTPException(status_code=400, detail=f"Error getting news: {e}")
