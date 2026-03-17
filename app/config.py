@@ -1,5 +1,6 @@
 SYMBOL_TO_YFINANCE: dict[str, str] = {
     "BTCUSD": "BTC-USD",
+    "ETHUSD": "ETH-USD",
 }
 
 

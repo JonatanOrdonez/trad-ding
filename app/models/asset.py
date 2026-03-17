@@ -10,6 +10,7 @@ from sqlmodel import Field, SQLModel
 class AssetType(str, Enum):
     stock = "stock"
     crypto = "crypto"
+    etf = "etf"
 
 
 class Asset(SQLModel, table=True):
