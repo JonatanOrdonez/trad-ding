@@ -1,31 +1,36 @@
 # Run project locally
 
-Start the trad-ding development server. Run this after the project is already installed (see /install).
+Start the trad-ding development servers. Run this after the project is already installed (see `/install`).
+
+trad-ding requires **two servers** running simultaneously:
+- **Backend** — FastAPI on http://localhost:8000
+- **Frontend** — Next.js on http://localhost:3000 (proxies API calls to :8000)
 
 ## Steps
 
-### 1. Activate virtual environment
+### Terminal 1 — Python backend
 
 ```bash
 source .venv/bin/activate
-```
-
-### 2. Apply any pending database migrations
-
-```bash
 make db-upgrade
-```
-
-### 3. Start the development server
-
-```bash
 make run
 ```
 
-The app will be available at **http://localhost:8000**.
+The backend will be available at **http://localhost:8000**.
 
-- Frontend UI: http://localhost:8000/
 - Health check: http://localhost:8000/health
 - API docs: http://localhost:8000/docs
 
-To stop the server, press `CTRL+C` in the terminal where it is running. To kill it if it gets stuck, use /kill-project.
+### Terminal 2 — Next.js frontend
+
+```bash
+npm run dev
+```
+
+The frontend will be available at **http://localhost:3000**.
+
+API calls from the browser (`/summary`, `/predictions/*`, `/news/*`, etc.) are automatically proxied to `localhost:8000` via the rewrites in `next.config.js`.
+
+---
+
+To stop either server, press `CTRL+C` in its terminal. To forcefully kill all processes and free ports, use `/kill-project`.

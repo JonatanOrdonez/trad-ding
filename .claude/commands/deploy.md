@@ -1,19 +1,19 @@
 # Deploy trad-ding
 
-trad-ding has **two separate deployment targets** that are independent of each other:
+trad-ding has **two separate deployment targets**:
 
-| Target | What it deploys | Command |
+| Target | What it deploys | Tool |
 |---|---|---|
-| **Vercel** | FastAPI backend + static frontend | `vercel --prod` |
-| **Modal** | XGBoost training function | `modal deploy app/train/modal_app.py` |
+| **Vercel** | Next.js frontend + FastAPI Python serverless | `vercel --prod` |
+| **Modal** | XGBoost training function | `modal deploy backend/train/modal_app.py` |
 
 ---
 
 ## Before deploying — checklist
 
-Make sure these are set in your environment / Vercel project settings:
+Make sure these are set in your Vercel project environment variables:
 
-```bash
+```
 DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 NEWS_API_KEY
 GROQ_API_KEY
@@ -21,14 +21,27 @@ SUPABASE_URL
 SUPABASE_KEY
 ```
 
-> For Vercel, add these in **Project Settings → Environment Variables**.  
-> For Modal, secrets are passed via `modal.Secret.from_dotenv()` — your local `.env` is used.
+Add them in **Vercel Dashboard → Project → Settings → Environment Variables**.
+
+For Modal, secrets are passed via `modal.Secret.from_dotenv()` — your local `.env` is used at deploy time.
 
 ---
 
-## 1. Deploy backend to Vercel
+## 1. Build check before deploy
 
-### Install Vercel CLI (if not already installed)
+Run the production build locally to catch any errors before pushing:
+
+```bash
+npm run build
+```
+
+Fix any TypeScript or build errors before proceeding.
+
+---
+
+## 2. Deploy to Vercel
+
+### Install Vercel CLI (first time only)
 
 ```bash
 npm install -g vercel
@@ -41,8 +54,9 @@ vercel login
 vercel --prod
 ```
 
-Vercel uses `api/index.py` as the serverless entrypoint and `vercel.json` for routing.  
-Static files in `app/static/` are served automatically.
+Vercel auto-detects Next.js as the framework (`vercel.json` sets `"framework": "nextjs"`).
+The Python serverless function at `api/index.py` is built with `@vercel/python@4`.
+API routes (`/summary`, `/predictions/*`, `/news/*`, etc.) are rewritten to `api/index.py` via `vercel.json`.
 
 ### Verify deployment
 
@@ -50,25 +64,16 @@ Static files in `app/static/` are served automatically.
 curl https://your-project.vercel.app/health
 ```
 
-Expected response: `{"status": "ok"}` or similar.
+Expected response: `{"status": "ok"}`.
+
+Also open the Vercel URL in the browser and verify the Next.js dashboard loads.
 
 ---
 
-## 2. Deploy ML training function to Modal
-
-The XGBoost training runs as a remote Modal function. It must be deployed separately.
-
-### Install and authenticate Modal (first time only)
+## 3. Deploy ML training function to Modal
 
 ```bash
-pip install modal
-modal token new
-```
-
-### Deploy the training function
-
-```bash
-modal deploy app/train/modal_app.py
+modal deploy backend/train/modal_app.py
 ```
 
 This registers the function as `trad-ding-training/train` in your Modal workspace.
@@ -85,6 +90,7 @@ You should see `trad-ding-training` listed as deployed.
 
 ## Notes
 
-- The Vercel backend calls Modal **at runtime** when `/train` or `/predictions/{symbol}` (first time, no model exists) is triggered. Both must be deployed and working for full functionality.
-- Database migrations are **not run automatically on deploy**. Run `make db-upgrade` manually against your production DB before the first deploy or after schema changes.
-- The frontend (`app/static/index.html`) is deployed as part of the Vercel deploy — no separate step needed.
+- **Database migrations are not run automatically on deploy.** Run `make db-upgrade` manually against your production DB before first deploy or after schema changes.
+- The frontend is served by Vercel's Next.js CDN. The backend runs as a Python serverless function on each API request.
+- The backend calls Modal **at runtime** when `/train` or `/predictions/{symbol}` (first run, no model exists) is triggered. Both Vercel and Modal must be deployed and working for full functionality.
+- Do **not** add a `builds` entry for Next.js in `vercel.json` — Vercel handles it automatically via `"framework": "nextjs"`.
