@@ -10,12 +10,7 @@ Validate that all required environment variables are present and that external s
 ls -la .env
 ```
 
-If it does not exist, copy the example and fill it in:
-
-```bash
-cp .env.example .env   # if an example exists
-# or create it manually — see README.md for required variables
-```
+If it does not exist, create it manually — see `README.md` for the required variables template.
 
 ---
 
@@ -74,7 +69,7 @@ except Exception as e:
 EOF
 ```
 
-> **Common fix:** If `could not translate host name ... to address` appears, your `DB_HOST` is wrong or your internet/VPN is blocking the connection. Try using the direct Supabase host (port 5432) instead of the pooler.
+> **Common fix:** If `could not translate host name` appears, your `DB_HOST` is wrong or VPN is blocking the connection.
 
 ---
 
@@ -135,7 +130,6 @@ from supabase import create_client
 
 try:
     client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-    # List buckets to confirm storage access
     buckets = client.storage.list_buckets()
     names = [b.name for b in buckets]
     print(f"✅ Supabase OK — buckets: {names}")
@@ -146,23 +140,34 @@ EOF
 
 ---
 
-## 7. Quick health check (server must be running)
+## 7. Quick health check (backend must be running)
 
 ```bash
 curl -s http://localhost:8000/health | python3 -m json.tool
 ```
 
-If the server is not running yet, use `/run-project` first.
+If the backend is not running, use `/run-project` first.
+
+---
+
+## 8. Verify Next.js build (optional)
+
+```bash
+npm run build
+```
+
+This confirms the frontend compiles without TypeScript or lint errors.
 
 ---
 
 ## Summary
 
-| Check | Command |
+| Check | Step |
 |---|---|
-| Variables set | Step 2 above |
-| DB reachable | Step 3 above |
-| Groq working | Step 4 above |
-| NewsAPI working | Step 5 above |
-| Supabase working | Step 6 above |
-| Server healthy | `curl localhost:8000/health` |
+| Variables set | Step 2 |
+| DB reachable | Step 3 |
+| Groq working | Step 4 |
+| NewsAPI working | Step 5 |
+| Supabase working | Step 6 |
+| Backend healthy | Step 7 |
+| Frontend builds | Step 8 |

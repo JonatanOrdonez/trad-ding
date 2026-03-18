@@ -2,7 +2,7 @@
 
 # Run the FastAPI application with auto-reload
 run:
-	uvicorn app.main:app --reload
+	uvicorn backend.main:app --reload
 
 
 # Sync the dependencies in requirements.txt with the current environment

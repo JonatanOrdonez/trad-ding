@@ -1,6 +1,6 @@
 # Create a new database migration
 
-Use this whenever you change a SQLModel table definition in `app/models/`.
+Use this whenever you change a SQLModel table definition in `backend/models/`.
 
 ---
 
@@ -17,10 +17,10 @@ Use this whenever you change a SQLModel table definition in `app/models/`.
 
 ### 1. Make your model change
 
-Edit the relevant file in `app/models/`. Example — adding a column to `Asset`:
+Edit the relevant file in `backend/models/`. Example — adding a column to `Asset`:
 
 ```python
-# app/models/asset.py
+# backend/models/asset.py
 class Asset(SQLModel, table=True):
     ...
     sector: str | None = Field(default=None)   # ← new column
@@ -34,12 +34,11 @@ make db-migrate msg="add sector to assets"
 
 This runs `alembic revision --autogenerate -m "..."` and creates a new file in `migrations/versions/`.
 
-> **Always review the generated file** before applying. Alembic sometimes misses renames, or generates `DROP` statements unintentionally.
+> **Always review the generated file** before applying. Alembic sometimes misses renames or generates unintentional `DROP` statements.
 
 ### 3. Review the generated migration
 
 ```bash
-# Open the latest migration file
 ls -t migrations/versions/ | head -1
 ```
 
@@ -54,9 +53,7 @@ make db-upgrade
 ### 5. Verify
 
 ```bash
-# Connect to your DB and confirm the schema change
-# Or just start the server and confirm there are no errors
-make run
+make run   # start the backend and confirm no errors
 ```
 
 ---
@@ -69,7 +66,7 @@ If you only need to insert initial data without a schema change:
 make db-seed msg="seed default assets"
 ```
 
-This creates a blank migration. Then write your `op.execute(...)` statements manually inside it.
+This creates a blank migration. Write your `op.execute(...)` statements manually inside it.
 
 ---
 

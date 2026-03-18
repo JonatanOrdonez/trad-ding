@@ -1,15 +1,17 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "api/index.py",
-            "use": "@vercel/python"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "api/index.py"
-        }
-    ]
+  "version": 2,
+  "framework": "nextjs",
+  "functions": {
+    "api/index.py": {
+      "runtime": "@vercel/python@4"
+    }
+  },
+  "rewrites": [
+    { "source": "/health", "destination": "/api/index.py" },
+    { "source": "/summary", "destination": "/api/index.py" },
+    { "source": "/assets/:path*", "destination": "/api/index.py" },
+    { "source": "/news/:path*", "destination": "/api/index.py" },
+    { "source": "/predictions/:path*", "destination": "/api/index.py" },
+    { "source": "/train", "destination": "/api/index.py" }
+  ]
 }

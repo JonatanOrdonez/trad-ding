@@ -2,27 +2,36 @@
 
 ## Project overview
 
-**trad-ding** is a FastAPI backend that generates AI-powered investment recommendations (BUY / SELL / HOLD) for stocks, crypto, and ETFs. It combines two signals:
+**trad-ding** is a full-stack AI-powered trading analysis app that generates investment recommendations (BUY / SELL / HOLD) for stocks, crypto, and ETFs. It combines two signals:
 
 1. **ML signal** — XGBoost classifier trained on 1 year of OHLCV price data using technical indicators. Training runs remotely on Modal; the resulting model is serialized as `.onnx` and stored in Supabase Storage. Inference runs locally via ONNX Runtime.
 2. **LLM signal** — Recent news (from NewsAPI + yfinance) fed into Llama 3.1 via Groq to produce sentiment analysis and a structured recommendation.
 
-Both signals are combined in `app/services/analysis.py`, which calls the LLM with a structured JSON prompt and returns an `AssetAnalysis` dataclass.
+Both signals are combined in `backend/services/analysis.py`, which calls the LLM with a structured JSON prompt and returns an `AssetAnalysis` dataclass.
 
 ## Commands
 
 ```bash
-# Start dev server (auto-reload)
-make run                          # uvicorn app.main:app --reload → http://localhost:8000
+# ── Python backend (FastAPI on :8000) ──────────────────────────────────────
+make run                          # uvicorn backend.main:app --reload
 
-# Database
+# ── Next.js frontend (:3000) ───────────────────────────────────────────────
+npm run dev                       # next dev → http://localhost:3000
+npm run build                     # production build
+npm run lint                      # ESLint
+
+# ── Database ───────────────────────────────────────────────────────────────
 make db-upgrade                   # alembic upgrade head
 make db-migrate msg="description" # autogenerate migration
 make db-seed msg="description"    # blank migration (for seeds)
 
-# Dependencies
+# ── Python dependencies ────────────────────────────────────────────────────
 make install dependency=<pkg>     # pip install + freeze to requirements.txt
 ```
+
+In development, run both servers simultaneously:
+- **Backend:** `make run` → http://localhost:8000
+- **Frontend:** `npm run dev` → http://localhost:3000 (proxies API calls to :8000 via `next.config.js`)
 
 Linting/formatting tools available: `flake8`, `black`, `isort`. Max line length is **122** characters (configured in `setup.cfg`).
 
@@ -31,8 +40,8 @@ Linting/formatting tools available: `flake8`, `black`, `isort`. Max line length 
 | Command | Use when |
 |---|---|
 | `/install` | Setting up the project for the first time |
-| `/run-project` | Starting the dev server |
-| `/kill-project` | Stopping all processes and freeing port 8000 |
+| `/run-project` | Starting both dev servers |
+| `/kill-project` | Stopping all processes and freeing ports 3000 and 8000 |
 | `/check-env` | Validating env vars and testing service connectivity |
 | `/deploy` | Deploying to Vercel + Modal |
 | `/new-migration` | Adding/changing a DB model and generating a migration |
@@ -40,20 +49,49 @@ Linting/formatting tools available: `flake8`, `black`, `isort`. Max line length 
 ## Architecture
 
 ```
-app/
-├── main.py              # FastAPI app, mounts routers and static files
-├── env.py               # Loads all env vars; raises RuntimeError on startup if any are missing
-├── db.py                # SQLAlchemy engine + session factory (get_session)
-├── supabase.py          # Supabase client factory
-├── models/              # SQLModel table definitions (Asset, AssetModel, AssetNews)
-├── repositories/        # Raw DB query functions — one file per model
-├── routers/             # FastAPI route handlers — thin, delegate to services
-├── services/            # Business logic (analysis, news, prediction, training)
-├── train/
-│   ├── features.py      # Feature engineering shared between local and remote
-│   └── modal_app.py     # Modal remote training function (deploys separately)
-├── types/               # Pydantic/dataclass response types
-└── static/index.html    # Frontend SPA — see "Frontend" section below
+trad-ding/
+├── api/
+│   └── index.py                # Vercel Python serverless entry: re-exports FastAPI app
+├── backend/                    # Python FastAPI application
+│   ├── main.py                 # App init, router registration
+│   ├── env.py                  # Env var loader — fails fast if any missing
+│   ├── db.py                   # SQLAlchemy engine + get_session() Depends generator
+│   ├── supabase.py             # Supabase client factory
+│   ├── models/                 # SQLModel table definitions
+│   ├── repositories/           # Raw DB queries — accept Session, no HTTP
+│   ├── routers/                # FastAPI route handlers — thin, delegate to services
+│   ├── services/               # Business logic (analysis, news, prediction, training)
+│   ├── train/
+│   │   ├── features.py         # Feature engineering (shared local + remote)
+│   │   └── modal_app.py        # Modal remote training function
+│   ├── types/                  # Pydantic/dataclass response types
+│   └── static/index.html       # Legacy SPA (kept for reference)
+├── src/                        # Next.js 15 frontend (App Router)
+│   ├── app/
+│   │   ├── layout.tsx          # Root layout (Geist font, metadata)
+│   │   ├── page.tsx            # Dashboard — Client Component, owns all state
+│   │   ├── loading.tsx         # Skeleton loading state
+│   │   └── error.tsx           # Error boundary
+│   ├── components/
+│   │   ├── ui/                 # Toast, PageLoader
+│   │   ├── layout/             # Header, SidePanel
+│   │   ├── assets/             # AssetCard, FilterBar, SignalSummary, CreateAssetModal
+│   │   ├── news/               # NewsList
+│   │   └── analysis/           # AnalysisPanel
+│   ├── hooks/                  # useAssets, useAnalysis, useNews, useToast, useKeyboard
+│   ├── lib/
+│   │   ├── api.ts              # fetch wrapper for all backend API calls
+│   │   ├── constants.ts        # design tokens, Tailwind class helpers
+│   │   └── utils.ts            # timeAgo, parseNewsRaw, localStorage helpers
+│   └── types/                  # TypeScript interfaces (asset, analysis, news)
+├── migrations/                 # Alembic migration files
+├── next.config.js              # Proxies API routes to localhost:8000 in dev
+├── vercel.json                 # Vercel: Next.js framework + Python serverless rewrites
+├── tailwind.config.ts
+├── tsconfig.json
+├── package.json
+├── Makefile
+└── requirements.txt
 ```
 
 ## Key data flow
@@ -68,10 +106,10 @@ app/
 ### Training (`GET /train`)
 1. `services/training.py` fetches 1 year of price history from yfinance.
 2. Dispatches `train_fn.remote(symbol, records)` to the Modal function `trad-ding-training/train`.
-3. The Modal function builds features (`app/train/features.py`), trains XGBoost, and uploads the `.onnx` model to Supabase Storage (`ml-models` bucket).
+3. The Modal function builds features (`backend/train/features.py`), trains XGBoost, and uploads the `.onnx` model to Supabase Storage (`ml-models` bucket).
 4. A new `AssetModel` row is saved only if ROC AUC improved or the existing model is older than 5 days.
 
-### ML features (defined in `app/train/features.py`)
+### ML features (defined in `backend/train/features.py`)
 `FEATURES = ["sma_7", "sma_20", "rsi", "macd", "macd_signal", "volume_change", "price_change"]`
 
 - Label: `1` if next day close > current close, else `0`.
@@ -79,14 +117,21 @@ app/
 
 ## Code conventions
 
+### Python (backend)
 - **Routers are thin** — validate input, call a service, raise `HTTPException` on error. No business logic in routers.
 - **Services own business logic** — never import from routers. Services may import from repositories.
 - **Repositories are pure DB** — only SQLModel/SQLAlchemy queries, no HTTP, no external calls. Always accept a `Session` as first argument and never create their own sessions.
-- **Session lifecycle** — sessions are created in the caller (router or service) with `get_session()`, used in a `try/finally` block, and closed in the `finally`. Repositories never open or close sessions.
-- **Concurrency** — CPU-bound or blocking I/O (yfinance, NewsAPI, Groq, Modal) is run in `ThreadPoolExecutor`. Async route handlers use `asyncio.to_thread` to avoid blocking the event loop.
+- **Session lifecycle** — `get_session()` is a FastAPI `Depends()` generator: `with Session(engine) as session: yield session`. Routers use `session: Session = Depends(get_session)`.
+- **Concurrency** — CPU-bound or blocking I/O (yfinance, NewsAPI, Groq, Modal) is run in `ThreadPoolExecutor`. Async route handlers use `asyncio.to_thread`.
 - **Symbols are always uppercase** — normalize with `.upper()` at the router boundary.
 - **Type hints are required** — all function signatures must have type hints. Use `X | None` union syntax (Python 3.10+), not `Optional[X]`.
-- **Dataclasses for responses** — `AssetAnalysis` and `AssetPrediction` are plain `@dataclass`; SQLModel/Pydantic `BaseModel` is used for DB models and request bodies.
+- **Dataclasses for responses** — `AssetAnalysis` and `AssetPrediction` are plain `@dataclass`.
+
+### TypeScript (frontend)
+- All components are Client Components (`"use client"`) — state is centralized in `src/app/page.tsx`.
+- API calls go through `src/lib/api.ts` — never fetch directly in components.
+- Design tokens (Tailwind class strings) live in `src/lib/constants.ts`.
+- `parseNewsRaw()` in `src/lib/utils.ts` parses the pipe-delimited news format from the backend — do **not** change without updating the backend too.
 
 ## Database models
 
@@ -102,7 +147,7 @@ app/
 
 ## Environment variables
 
-All variables are required. The app fails immediately at startup if any are missing (`app/env.py`).
+All variables are required. The app fails immediately at startup if any are missing (`backend/env.py`).
 
 ```ini
 DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME   # PostgreSQL connection
@@ -118,22 +163,16 @@ For Modal (remote training): authenticate with `modal token new`. The `.env` fil
 
 | Service | Purpose | Used in |
 |---|---|---|
-| PostgreSQL | Persistent storage | `app/db.py` |
+| PostgreSQL | Persistent storage | `backend/db.py` |
 | Supabase Storage | Store/retrieve `.onnx` model files | `services/prediction.py`, `train/modal_app.py` |
 | Groq | LLM inference (Llama 3.1) | `services/analysis.py` |
 | NewsAPI | General business news | `services/news.py` |
 | yfinance | Asset-specific news + price history | `services/news.py`, `services/training.py`, `services/prediction.py` |
 | Modal | Remote XGBoost training | `services/training.py`, `train/modal_app.py` |
 
-## Frontend (`app/static/index.html`)
+## Frontend (`src/`)
 
-A single-file SPA with no build step. Tailwind CSS via CDN, vanilla JavaScript.
-
-### State & data flow
-
-- On load, `loadAssets()` calls `GET /summary` and populates `allAssets[]`.
-- `renderGrid()` applies three filters in order: **type** (`activeFilter`) → **signal** (`activeSignal`) → **search** (`searchQuery`), then sorts by `sortBy`.
-- Analysis results are persisted to **`localStorage`** under key `td_analysis_{symbol}` as `{ action, ts }`. This powers the last-analysis badge on cards and the portfolio signal summary strip.
+Next.js 15 App Router, TypeScript, Tailwind CSS v3. The dashboard at `src/app/page.tsx` is a Client Component that owns all UI state and delegates to hooks and sub-components.
 
 ### News data format
 
@@ -143,19 +182,7 @@ The `GET /news/{symbol}` endpoint returns items where `item.summary` is a **pipe
 Title: <title> | Date: <ISO date> | Source: <source name> | Summary: <text> | URL: <url>
 ```
 
-The frontend parses this with `parseNewsRaw(raw)` before rendering structured news cards. Do **not** change this parsing logic without updating the backend response format.
-
-### Key JS functions
-
-| Function | Purpose |
-|---|---|
-| `renderGrid()` | Re-renders asset cards applying current filter, signal, search, and sort state |
-| `analyze(symbol)` | Calls `GET /predictions/{symbol}`, renders analysis panel with score bar and sections |
-| `showNews(symbol, offset)` | Calls `GET /news/{symbol}`, parses raw summaries, renders structured news cards |
-| `analyzeAll()` | Sequentially calls `analyze()` for every asset; shows progress and result toast |
-| `showToast(msg, type, duration)` | Shows a corner toast (`success`, `error`, `warning`, `info`); auto-dismisses |
-| `updateSignalSummary()` | Reads localStorage for all assets, updates BUY/SELL/HOLD pill counts |
-| `parseNewsRaw(raw)` | Parses pipe-delimited news string into `{ title, date, source, summary, url }` |
+The frontend parses this with `parseNewsRaw()` in `src/lib/utils.ts`. Do **not** change this format without updating both sides.
 
 ### Mobile considerations
 
@@ -163,10 +190,32 @@ The frontend parses this with `parseNewsRaw(raw)` before rendering structured ne
 - All interactive elements meet 44px minimum touch target (`min-h-[44px]`).
 - Toast container is full-width on mobile (`inset-x-3`) and anchored to corner on desktop (`sm:right-5`).
 - Header shows `+ Add` (mobile) vs `+ Add asset` (desktop).
-- Search expands to full available width on mobile (`flex-1 sm:max-w-xs`).
 
 ## Deployment
 
-- Deployed on **Vercel** via `api/index.py` (re-exports the FastAPI `app`).
-- The Modal training app (`train/modal_app.py`) is deployed separately with `modal deploy app/train/modal_app.py` and referenced by name `"trad-ding-training"`.
-- Static files are served from `app/static/`.
+### Vercel (monorepo — Next.js + Python serverless)
+
+`vercel.json` configures:
+- **Framework:** `nextjs` — Vercel auto-builds the Next.js frontend.
+- **Python function:** `api/index.py` built with `@vercel/python@4`.
+- **Rewrites:** `/health`, `/summary`, `/assets/*`, `/news/*`, `/predictions/*`, `/train` → `api/index.py`.
+
+Next.js serves the frontend at the root. All API routes are intercepted by Vercel rewrites and forwarded to the Python serverless function.
+
+> **Important:** Do NOT add a `builds` entry for Next.js in `vercel.json` — Vercel handles it automatically via `"framework": "nextjs"`. Only `api/index.py` needs an explicit build entry.
+
+### Modal (ML training)
+
+```bash
+modal deploy backend/train/modal_app.py
+```
+
+Registers the function as `trad-ding-training/train`. Called at runtime by the backend when `/train` or `/predictions/{symbol}` (first run, no model) is triggered.
+
+### Database migrations on deploy
+
+Migrations are **not run automatically**. Run manually against production DB before the first deploy or after schema changes:
+
+```bash
+make db-upgrade
+```
