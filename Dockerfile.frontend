@@ -9,6 +9,14 @@ FROM node:22-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY web/ .
+
+# Dummy env vars so Next.js build can initialize modules that read them at import time.
+# Real values are injected at runtime via docker-compose environment.
+ENV SUPABASE_URL=https://placeholder.supabase.co
+ENV SUPABASE_KEY=placeholder
+ENV NEWS_API_KEY=placeholder
+ENV GROQ_API_KEY=placeholder
+
 RUN npm run build
 
 # ── Stage 3: Production ──────────────────────────────────────────────────────
