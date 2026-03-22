@@ -7,6 +7,7 @@ image = (
     .pip_install(
         "xgboost",
         "scikit-learn",
+        "skl2onnx",
         "pandas",
         "supabase",
         "numpy",
@@ -58,9 +59,16 @@ def train(symbol: str, records: list[dict]) -> dict:
     y_proba = model.predict_proba(X_test)[:, 1]
     roc_auc = round(float(roc_auc_score(y_test, y_proba)), 4)
 
-    model.save_model("/tmp/model.onnx")
-    with open("/tmp/model.onnx", "rb") as f:
-        onnx_bytes = f.read()
+    from skl2onnx import convert_sklearn
+    from skl2onnx.common.data_types import FloatTensorType
+
+    initial_type = [("features", FloatTensorType([None, len(FEATURES)]))]
+    onnx_model = convert_sklearn(
+        model,
+        initial_types=initial_type,
+        options={id(model): {"zipmap": False}},
+    )
+    onnx_bytes = onnx_model.SerializeToString()
 
     supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
