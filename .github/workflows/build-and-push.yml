@@ -57,3 +57,11 @@ jobs:
           tags: |
             ghcr.io/jonatanordonez/trad-ding/frontend:latest
             ghcr.io/jonatanordonez/trad-ding/frontend:sha-${{ github.sha }}
+
+  deploy:
+    name: Deploy to Dokploy
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    steps:
+      - name: Trigger Dokploy deploy
+        run: curl -X POST "https://dokploy.astrolab.com.co/api/deploy/compose/755eJFwdVX0QWiVly_1Mj"

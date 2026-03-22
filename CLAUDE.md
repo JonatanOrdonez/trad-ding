@@ -191,6 +191,26 @@ The frontend parses this with `parseNewsRaw()` in `src/lib/utils.ts`. Do **not**
 - Toast container is full-width on mobile (`inset-x-3`) and anchored to corner on desktop (`sm:right-5`).
 - Header shows `+ Add` (mobile) vs `+ Add asset` (desktop).
 
+## Sistema de documentación
+
+Al inicio de cada tarea, leer `docs/INDEX.md` para saber qué documentación existe y cuándo consultarla.
+
+### Archivos clave
+
+| Archivo | Contenido |
+|---|---|
+| `docs/INDEX.md` | Índice de toda la documentación. Punto de entrada. |
+| `docs/DEPLOYMENT.md` | Arquitectura de producción, CI/CD, Dokploy, variables de entorno, redeploy y troubleshooting. |
+| `docs/LEARNINGS.md` | Lecciones no obvias: Docker, Next.js build-time, Alpine vs glibc, Traefik, GHCR. |
+
+### Cuándo actualizar la documentación
+
+- Al completar una tarea de deploy o infraestructura: actualizar `docs/DEPLOYMENT.md` si algo cambia.
+- Si descubres algo no obvio sobre el stack: agregar una entrada a `docs/LEARNINGS.md`.
+- Si creas un documento nuevo en `docs/`: registrarlo en `docs/INDEX.md`.
+
+---
+
 ## Deployment
 
 ### Vercel (monorepo — Next.js + Python serverless)
