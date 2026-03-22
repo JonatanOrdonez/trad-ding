@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://trad-ding.vercel.app"
+  }
+}

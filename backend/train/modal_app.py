@@ -11,7 +11,7 @@ image = (
         "supabase",
         "numpy",
     )
-    .add_local_file("app/train/features.py", "/root/features.py")
+    .add_local_file("backend/train/features.py", "/root/features.py")
 )
 
 BUCKET = "ml-models"

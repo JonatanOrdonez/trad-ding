@@ -1,27 +1,51 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
+
 import modal
 import yfinance as yf
-from sqlmodel import Session
-from backend.db import engine
-from backend.repositories import assets as assets_repository
-from backend.repositories import asset_models as asset_models_repository
+
+from backend.supabase import get_supabase
 from backend.train.features import FEATURES
 
 logger = logging.getLogger(__name__)
 
 
-def train_asset(symbol: str) -> dict:
-    with Session(engine) as session:
-        asset = assets_repository.get_asset_by_symbol(session, symbol)
-        if asset is None:
-            raise ValueError(f"Asset with symbol {symbol} not found")
+def _get_all_assets() -> list[dict]:
+    return get_supabase().from_("assets").select("id, symbol, yfinance_symbol").execute().data or []
 
-        existing_model = asset_models_repository.get_active_model(session, asset.id)
 
-    logger.info(f"Fetching historical data for {symbol}")
-    df = yf.Ticker(asset.yfinance_symbol).history(period="1y")
+def _get_active_model(asset_id: str) -> dict | None:
+    return (
+        get_supabase()
+        .from_("asset_models")
+        .select("id, metrics, created_at")
+        .eq("asset_id", asset_id)
+        .eq("is_active", True)
+        .maybe_single()
+        .execute()
+        .data
+    )
+
+
+def _deactivate_models(asset_id: str) -> None:
+    get_supabase().from_("asset_models").update({"is_active": False}).eq("asset_id", asset_id).execute()
+
+
+def _save_model(asset_id: str, storage_path: str, metrics: dict) -> None:
+    get_supabase().from_("asset_models").insert({
+        "asset_id": asset_id,
+        "storage_path": storage_path,
+        "metrics": metrics,
+        "is_active": True,
+    }).execute()
+
+
+def train_asset(symbol: str, asset_id: str, yfinance_symbol: str) -> dict:
+    existing_model = _get_active_model(asset_id)
+
+    logger.info(f"Fetching 1y historical data for {symbol}")
+    df = yf.Ticker(yfinance_symbol).history(period="1y")
     df.dropna(inplace=True)
     records = df.reset_index().to_dict(orient="records")
 
@@ -29,48 +53,38 @@ def train_asset(symbol: str) -> dict:
     train_fn = modal.Function.from_name("trad-ding-training", "train")
     result = train_fn.remote(symbol, records)
 
-    with Session(engine) as session:
-        roc_auc = result["metrics"]["roc_auc"]
+    roc_auc = result["metrics"]["roc_auc"]
 
-        if existing_model is None:
-            should_save = True
-        else:
-            existing_roc_auc = existing_model.metrics.get("roc_auc", 0)
-            improved = roc_auc > existing_roc_auc
-            stale = datetime.now(timezone.utc) - existing_model.trained_at.replace(tzinfo=timezone.utc) > timedelta(days=5)
-            should_save = improved or stale
+    if existing_model is None:
+        should_save = True
+    else:
+        existing_roc_auc = (existing_model.get("metrics") or {}).get("roc_auc", 0)
+        improved = roc_auc > existing_roc_auc
+        created_at = datetime.fromisoformat(existing_model["created_at"].replace("Z", "+00:00"))
+        stale = datetime.now(timezone.utc) - created_at > timedelta(days=5)
+        should_save = improved or stale
 
-        if not should_save:
-            return {"improved": False, "metrics": result.get("metrics", {})}
+    if not should_save:
+        return {"improved": False, "metrics": result.get("metrics", {})}
 
-        asset_models_repository.deactivate_models(session, asset.id)
-        asset_models_repository.create_asset_model(
-            session,
-            asset.id,
-            result["storage_path"],
-            result["metrics"],
-            {"features": FEATURES, "period": "1y"},
-        )
+    _deactivate_models(asset_id)
+    _save_model(asset_id, result["storage_path"], result["metrics"])
 
-        logger.info(f"Model for {symbol} trained and registered. Metrics: {result['metrics']}")
-        return {"improved": True, "metrics": result["metrics"]}
+    logger.info(f"Model for {symbol} saved. Metrics: {result['metrics']}")
+    return {"improved": True, "metrics": result["metrics"]}
 
 
-def _train_asset_threadsafe(symbol: str) -> dict:
+def _train_asset_safe(asset: dict) -> dict:
+    symbol = asset["symbol"]
     try:
-        return {"symbol": symbol, **train_asset(symbol)}
+        return {"symbol": symbol, **train_asset(symbol, asset["id"], asset["yfinance_symbol"])}
     except Exception as e:
-        logger.error(f"Failed to train model for {symbol}: {e}")
+        logger.error(f"Training failed for {symbol}: {e}")
         return {"symbol": symbol, "improved": False, "error": str(e)}
 
 
 def train_all_assets() -> list[dict]:
-    with Session(engine) as session:
-        assets = assets_repository.get_assets(session)
-
+    assets = _get_all_assets()
     with ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(_train_asset_threadsafe, asset.symbol)
-            for asset in assets
-        ]
-        return [future.result() for future in as_completed(futures)]
+        futures = [executor.submit(_train_asset_safe, asset) for asset in assets]
+        return [f.result() for f in as_completed(futures)]
