@@ -1,0 +1,46 @@
+services:
+  tradding-backend:
+    image: ghcr.io/jonatanordonez/trad-ding/backend:latest
+    restart: always
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tradding-backend.rule=Host(`api.trad-ding.com`)"
+      - "traefik.http.routers.tradding-backend.entrypoints=websecure"
+      - "traefik.http.routers.tradding-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tradding-backend.loadbalancer.server.port=8000"
+
+  tradding-frontend:
+    image: ghcr.io/jonatanordonez/trad-ding/frontend:latest
+    restart: always
+    depends_on:
+      tradding-backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://tradding-backend:8000
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      NEWS_API_KEY: ${NEWS_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tradding-frontend.rule=Host(`trad-ding.com`) || Host(`www.trad-ding.com`)"
+      - "traefik.http.routers.tradding-frontend.entrypoints=websecure"
+      - "traefik.http.routers.tradding-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tradding-frontend.loadbalancer.server.port=3000"
+
+networks:
+  dokploy-network:
+    external: true

@@ -1,0 +1,21 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+
+# Node
+node_modules/
+.next/
+
+# IDE / tools
+.omc/
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

@@ -36,7 +36,7 @@ export async function GET(
       return Response.json({ detail: "Not enough price data" }, { status: 422 });
     }
 
-    const records = raw.map((h) => ({ close: h.close, volume: h.volume }));
+    const records = raw.map((h: { close: number; volume: number }) => ({ close: h.close, volume: h.volume }));
     const features = buildFeatures(records);
 
     if (features.length === 0) {
