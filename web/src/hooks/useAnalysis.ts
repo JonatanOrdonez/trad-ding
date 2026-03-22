@@ -8,7 +8,7 @@ import type { AssetAnalysis } from "@/types/analysis";
 export function useAnalysis() {
   const analyze = useCallback(async (symbol: string): Promise<AssetAnalysis> => {
     const result = await fetchAnalysis(symbol);
-    saveAnalysis(symbol, result.action);
+    saveAnalysis(symbol, result.action, result.score);
     return result;
   }, []);
 

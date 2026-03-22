@@ -42,11 +42,12 @@ export async function predictAsset(
 
   let historical: { close: number; volume: number }[] = [];
   try {
-    historical = await yf.historical(
+    const raw = await yf.historical(
       yfinanceSymbol,
       { period1: startDate, period2: endDate },
       { validateResult: false }
     );
+    historical = raw.filter((h: { close: number | null }) => h.close !== null) as { close: number; volume: number }[];
   } catch {
     return null;
   }
@@ -55,7 +56,10 @@ export async function predictAsset(
 
   const records = historical.map((h) => ({ close: h.close, volume: h.volume }));
   const features = buildFeatures(records);
-  if (features.length === 0) return null;
+  if (features.length === 0) {
+    console.log(`[predictAsset] feature engineering returned 0 rows`);
+    return null;
+  }
 
   const last = features[features.length - 1];
   const inputData = Float32Array.from(
@@ -63,8 +67,8 @@ export async function predictAsset(
   );
 
   try {
-    const buffer = Buffer.from(await blob.arrayBuffer());
-    const session = await ort.InferenceSession.create(buffer);
+    const modelBytes = new Uint8Array(await blob.arrayBuffer());
+    const session = await ort.InferenceSession.create(modelBytes);
     const inputTensor = new ort.Tensor("float32", inputData, [1, FEATURES.length]);
     const results = await session.run({ [session.inputNames[0]]: inputTensor });
     const proba = results[session.outputNames[1]].data as Float32Array;

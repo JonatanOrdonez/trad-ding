@@ -5,7 +5,7 @@ import type { ToastType, Toast } from "@/hooks/useToast";
 const TOAST_STYLES: Record<ToastType, string> = {
   success: "bg-green-500/15 border-green-500/30 text-green-300",
   error: "bg-red-500/15 border-red-500/30 text-red-300",
-  info: "bg-gray-800 border-gray-700 text-gray-200",
+  info: "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200",
   warning: "bg-yellow-500/15 border-yellow-500/30 text-yellow-300",
 };
 

@@ -15,6 +15,7 @@ export interface AssetAnalysis {
   monitor: string[];
   action: Signal;
   recommendation: string;
+  ml_confidence: number | null;
 }
 
 export interface ChartRow {

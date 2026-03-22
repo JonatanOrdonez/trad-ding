@@ -17,6 +17,8 @@ export const SORT_OPTIONS = [
   { value: "symbol", label: "Symbol A–Z" },
   { value: "analyzed", label: "Last analyzed" },
   { value: "action", label: "Signal (BUY first)" },
+  { value: "score-high", label: "Highest score" },
+  { value: "score-low", label: "Lowest score" },
 ] as const;
 
 export const SORT_LABELS: Record<string, string> = {
@@ -24,6 +26,8 @@ export const SORT_LABELS: Record<string, string> = {
   symbol: "A–Z",
   analyzed: "Recent",
   action: "Signal",
+  "score-high": "Score ↑",
+  "score-low": "Score ↓",
 };
 
 // ── Action (BUY / SELL / HOLD) style helpers ───────────────────────────────────
@@ -103,11 +107,11 @@ export function typeBadgeClasses(type: AssetType): string {
 export function cardTypeClass(type: AssetType): string {
   switch (type) {
     case "stock":
-      return "hover:border-blue-800/60";
+      return "hover:border-blue-300/60 dark:hover:border-blue-800/60";
     case "crypto":
-      return "hover:border-orange-800/60";
+      return "hover:border-orange-300/60 dark:hover:border-orange-800/60";
     case "etf":
-      return "hover:border-purple-800/60";
+      return "hover:border-purple-300/60 dark:hover:border-purple-800/60";
     default:
       return "";
   }

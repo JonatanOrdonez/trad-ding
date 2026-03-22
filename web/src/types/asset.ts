@@ -22,4 +22,5 @@ export interface CreateAssetRequest {
 export interface LocalAnalysis {
   action: "BUY" | "SELL" | "HOLD";
   ts: number;
+  score?: number;
 }

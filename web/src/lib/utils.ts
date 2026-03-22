@@ -17,9 +17,9 @@ export function loadAnalysis(symbol: string): LocalAnalysis | null {
   }
 }
 
-export function saveAnalysis(symbol: string, action: Signal): void {
+export function saveAnalysis(symbol: string, action: Signal, score?: number): void {
   if (typeof window === "undefined") return;
-  const data: LocalAnalysis = { action, ts: Date.now() };
+  const data: LocalAnalysis = { action, ts: Date.now(), ...(score !== undefined && { score }) };
   localStorage.setItem(`${LS_PREFIX}${symbol}`, JSON.stringify(data));
 }
 

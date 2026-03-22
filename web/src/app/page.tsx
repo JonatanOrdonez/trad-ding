@@ -26,6 +26,7 @@ import { useAnalysis } from "@/hooks/useAnalysis";
 import { useNews } from "@/hooks/useNews";
 import { useToast } from "@/hooks/useToast";
 import { useKeyboard } from "@/hooks/useKeyboard";
+import { useTheme } from "@/hooks/useTheme";
 
 // Lib
 import { loadAnalysis, saveAnalysis } from "@/lib/utils";
@@ -64,6 +65,7 @@ function getCountsMap(assets: Asset[]): Record<string, number> {
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const { dark, toggle: toggleTheme } = useTheme();
   const { assets, loading: assetsLoading, load, create, remove } = useAssets();
   const { analyze } = useAnalysis();
   const { items: newsItems, offset: newsOffset, loading: newsLoading, error: newsError, load: loadNews, hasMore, hasPrev } = useNews();
@@ -119,7 +121,7 @@ export default function DashboardPage() {
     for (const asset of assets) {
       try {
         const result = await analyze(asset.symbol);
-        saveAnalysis(asset.symbol, result.action);
+        saveAnalysis(asset.symbol, result.action, result.score);
         done++;
       } catch {
         failed++;
@@ -226,6 +228,18 @@ export default function DashboardPage() {
       const ba = loadAnalysis(b.symbol)?.action ?? "";
       return (order[aa] ?? 3) - (order[ba] ?? 3);
     });
+  } else if (sortBy === "score-high") {
+    visible.sort((a, b) => {
+      const sa = loadAnalysis(a.symbol)?.score ?? -999;
+      const sb = loadAnalysis(b.symbol)?.score ?? -999;
+      return sb - sa;
+    });
+  } else if (sortBy === "score-low") {
+    visible.sort((a, b) => {
+      const sa = loadAnalysis(a.symbol)?.score ?? 999;
+      const sb = loadAnalysis(b.symbol)?.score ?? 999;
+      return sa - sb;
+    });
   }
 
   // ── Panel title & content ────────────────────────────────────────────────────
@@ -276,7 +290,7 @@ export default function DashboardPage() {
         {panel.rows.map((r) => (
           <div
             key={r.symbol}
-            className="flex items-center justify-between py-2.5 border-b border-gray-800 last:border-0"
+            className="flex items-center justify-between py-2.5 border-b border-gray-200 dark:border-gray-800 last:border-0"
           >
             <span className="text-sm font-medium">{r.symbol}</span>
             <span
@@ -308,6 +322,8 @@ export default function DashboardPage() {
         onSyncNews={handleSyncNews}
         onTrainAll={handleTrainAll}
         onAnalyzeAll={handleAnalyzeAll}
+        isDark={dark}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Signal summary strip */}
@@ -343,14 +359,14 @@ export default function DashboardPage() {
           {/* Empty state */}
           {isEmpty && (
             <div className="col-span-full flex flex-col items-center justify-center py-20 gap-4 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center">
-                <svg className="w-7 h-7 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center">
+                <svg className="w-7 h-7 text-gray-400 dark:text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                   <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
                   <polyline points="16 7 22 7 22 13" />
                 </svg>
               </div>
               <div>
-                <p className="text-white font-medium mb-1">No assets yet</p>
+                <p className="text-gray-900 dark:text-white font-medium mb-1">No assets yet</p>
                 <p className="text-gray-500 text-sm">Add your first stock, crypto, or ETF to get started.</p>
               </div>
               <button
@@ -366,7 +382,7 @@ export default function DashboardPage() {
           {/* No match for filter/search */}
           {noMatch && (
             <div className="col-span-full flex flex-col items-center gap-2 py-16 text-center">
-              <svg className="w-8 h-8 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <svg className="w-8 h-8 text-gray-300 dark:text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>

@@ -68,7 +68,7 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
       aria-labelledby="modal-title"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md p-5 sm:p-6 space-y-5 shadow-2xl">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md p-5 sm:p-6 space-y-5 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 id="modal-title" className="text-base font-semibold">Add asset</h2>
@@ -76,7 +76,7 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="cursor-pointer flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="cursor-pointer flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -87,7 +87,7 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
         {/* Fields */}
         <div className="space-y-4">
           <div>
-            <label htmlFor="f-name" className="text-sm font-medium text-gray-300 block mb-1.5">Name</label>
+            <label htmlFor="f-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Name</label>
             <input
               ref={nameRef}
               id="f-name"
@@ -96,11 +96,11 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="off"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150"
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150"
             />
           </div>
           <div>
-            <label htmlFor="f-symbol" className="text-sm font-medium text-gray-300 block mb-1.5">Symbol</label>
+            <label htmlFor="f-symbol" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Symbol</label>
             <input
               id="f-symbol"
               type="text"
@@ -108,11 +108,11 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
               value={symbol}
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               autoComplete="off"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 uppercase focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150"
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 uppercase focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150"
             />
           </div>
           <div>
-            <label htmlFor="f-yfinance" className="text-sm font-medium text-gray-300 block mb-1.5">Yahoo Finance symbol</label>
+            <label htmlFor="f-yfinance" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Yahoo Finance symbol</label>
             <input
               id="f-yfinance"
               type="text"
@@ -120,17 +120,17 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
               value={yfinanceSymbol}
               onChange={(e) => setYfinanceSymbol(e.target.value)}
               autoComplete="off"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150"
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150"
             />
-            <p className="text-xs text-gray-500 mt-1.5">Will be validated against Yahoo Finance.</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">Will be validated against Yahoo Finance.</p>
           </div>
           <div>
-            <label htmlFor="f-type" className="text-sm font-medium text-gray-300 block mb-1.5">Type</label>
+            <label htmlFor="f-type" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">Type</label>
             <select
               id="f-type"
               value={assetType}
               onChange={(e) => setAssetType(e.target.value as AssetType)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150 cursor-pointer"
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors duration-150 cursor-pointer"
             >
               <option value="stock">Stock</option>
               <option value="crypto">Crypto</option>
@@ -156,7 +156,7 @@ export function CreateAssetModal({ isOpen, onClose, onSubmit }: CreateAssetModal
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer flex-1 min-h-[44px] bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-sm font-medium py-2.5 rounded-xl transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+            className="cursor-pointer flex-1 min-h-[44px] bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 active:bg-gray-300 dark:active:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium py-2.5 rounded-xl transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
           >
             Cancel
           </button>

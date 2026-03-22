@@ -24,6 +24,7 @@ Both signals are weighed by the LLM to produce a final recommendation that inclu
 | LLM | Groq API — `llama-3.1-8b-instant` |
 | News | NewsAPI + yfinance |
 | Price data | yfinance |
+| Cache | Upstash Redis (REST API via `@upstash/redis`) |
 | Deployment | Vercel (Next.js frontend + Python serverless) + Modal (ML training) |
 
 ## Project structure
@@ -118,6 +119,10 @@ GROQ_API_KEY=your_groq_api_key
 # Supabase (for ML model storage)
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_supabase_service_role_key
+
+# Upstash Redis (for response caching)
+UPSTASH_REDIS_REST_URL=https://your-db.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_token
 ```
 
 > The Python backend will refuse to start if any of these variables are missing.

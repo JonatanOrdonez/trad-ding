@@ -90,17 +90,24 @@ export function SignalSummary({
   const visiblePills = pills.filter((p) => p.count > 0);
   if (!visiblePills.length && !counts.unanalyzed) return null;
 
+  const scores = Object.values(localAnalyses)
+    .map((a) => a?.score)
+    .filter((s): s is number => s !== undefined && s !== null);
+  const avgScore = scores.length > 0
+    ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100) / 100
+    : null;
+
   return (
     <div className="px-4 sm:px-6 pt-4 pb-1">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-gray-600 font-medium mr-1">Portfolio signals</span>
+        <span className="text-xs text-gray-500 dark:text-gray-600 font-medium mr-1">Portfolio signals</span>
         {visiblePills.map((pill) => (
           <button
             key={pill.id}
             type="button"
             onClick={() => onSignalClick(activeSignal === pill.id ? null : pill.id)}
             className={`signal-pill inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 min-h-[32px] rounded-full ${pill.bg} ${pill.text} border ${pill.border} cursor-pointer focus:outline-none focus-visible:ring-2 ${pill.ring} transition-all ${
-              activeSignal === pill.id ? "ring-2 ring-offset-2 ring-offset-gray-950" : ""
+              activeSignal === pill.id ? "ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-950" : ""
             }`}
           >
             {pill.icon}
@@ -110,8 +117,20 @@ export function SignalSummary({
           </button>
         ))}
         {counts.unanalyzed > 0 && (
-          <span className="text-xs text-gray-600 tabular-nums">
+          <span className="text-xs text-gray-500 dark:text-gray-600 tabular-nums">
             {counts.unanalyzed} not yet analyzed
+          </span>
+        )}
+
+        {avgScore !== null && (
+          <span className={`ml-auto text-xs font-medium tabular-nums px-2.5 py-1 rounded-full border ${
+            avgScore >= 0.2
+              ? "text-green-600 dark:text-green-400 bg-green-500/8 border-green-500/20"
+              : avgScore <= -0.2
+              ? "text-red-500 dark:text-red-400 bg-red-500/8 border-red-500/20"
+              : "text-yellow-600 dark:text-yellow-400 bg-yellow-500/8 border-yellow-500/20"
+          }`}>
+            Avg {avgScore > 0 ? "+" : ""}{avgScore.toFixed(2)}
           </span>
         )}
       </div>

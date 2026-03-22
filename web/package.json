@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",
+    "@upstash/redis": "^1.37.0",
     "groq-sdk": "^1.1.1",
     "newsapi": "^2.4.1",
     "next": "15.3.0",

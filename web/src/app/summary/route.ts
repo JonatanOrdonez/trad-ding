@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/services/supabase";
+import { getCached, setCached } from "@/lib/cache";
+
+const CACHE_TTL = 30;
+const CACHE_KEY = "summary";
 
 export async function GET(req: NextRequest) {
+  const cached = await getCached(CACHE_KEY);
+  if (cached) return Response.json(cached);
+
   const { data: assets, error } = await supabase
     .from("assets")
     .select("symbol, name, asset_type")
@@ -21,5 +28,6 @@ export async function GET(req: NextRequest) {
     },
   }));
 
+  await setCached(CACHE_KEY, result, CACHE_TTL);
   return Response.json(result);
 }

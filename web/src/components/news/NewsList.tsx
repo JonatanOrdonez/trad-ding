@@ -20,7 +20,7 @@ export function NewsCard({ item, index }: NewsCardProps) {
 
   return (
     <article
-      className="group bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-gray-700 transition-all duration-200 hover:shadow-lg hover:shadow-black/30"
+      className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30"
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="p-4 space-y-3">
@@ -34,23 +34,23 @@ export function NewsCard({ item, index }: NewsCardProps) {
             </svg>
             {srcLabel}
           </span>
-          {date && <span className="text-xs text-gray-600 tabular-nums">{date}</span>}
+          {date && <span className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">{date}</span>}
         </div>
 
         {/* Title */}
-        <h3 className="text-sm font-semibold text-gray-100 leading-snug group-hover:text-white transition-colors duration-150 line-clamp-2">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-snug group-hover:text-gray-900 dark:group-hover:text-white transition-colors duration-150 line-clamp-2">
           {title}
         </h3>
 
         {/* Summary */}
         {summary && (
-          <p className="text-xs text-gray-400 leading-[1.7] line-clamp-3">{summary}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-[1.7] line-clamp-3">{summary}</p>
         )}
       </div>
 
       {/* Footer */}
       {url && (
-        <div className="px-4 pb-3 flex items-center justify-between border-t border-gray-800/70 pt-3">
+        <div className="px-4 pb-3 flex items-center justify-between border-t border-gray-100 dark:border-gray-800/70 pt-3">
           <a
             href={url}
             target="_blank"
@@ -65,7 +65,7 @@ export function NewsCard({ item, index }: NewsCardProps) {
               <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
           </a>
-          <span className="text-xs text-gray-700 uppercase tracking-widest">
+          <span className="text-xs text-gray-400 dark:text-gray-700 uppercase tracking-widest">
             {((item.source_type as string) || "").toUpperCase()}
           </span>
         </div>
@@ -89,7 +89,7 @@ export function NewsList({ items, symbol, offset, hasMore, hasPrev, loading, onL
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-gray-400 text-sm py-10 justify-center">
+      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm py-10 justify-center">
         <svg className="animate-spin h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -102,13 +102,13 @@ export function NewsList({ items, symbol, offset, hasMore, hasPrev, loading, onL
   if (!items.length) {
     return (
       <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center">
-          <svg className="w-6 h-6 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+          <svg className="w-6 h-6 text-gray-400 dark:text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
             <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
           </svg>
         </div>
-        <p className="text-sm font-medium text-gray-300">No news yet for {symbol}</p>
-        <p className="text-xs text-gray-600 max-w-[220px]">Try syncing news from the Actions menu to fetch the latest articles.</p>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No news yet for {symbol}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-600 max-w-[220px]">Try syncing news from the Actions menu to fetch the latest articles.</p>
       </div>
     );
   }
@@ -116,7 +116,7 @@ export function NewsList({ items, symbol, offset, hasMore, hasPrev, loading, onL
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between pb-1">
-        <p className="text-xs text-gray-600 tabular-nums">
+        <p className="text-xs text-gray-400 dark:text-gray-600 tabular-nums">
           {items.length} article{items.length !== 1 ? "s" : ""} · page {page}
         </p>
       </div>
@@ -131,7 +131,7 @@ export function NewsList({ items, symbol, offset, hasMore, hasPrev, loading, onL
           type="button"
           disabled={!hasPrev}
           onClick={() => onLoadPage(symbol, offset - 5)}
-          className="cursor-pointer flex-1 min-h-[40px] flex items-center justify-center gap-1.5 text-sm font-medium rounded-xl border border-gray-800 hover:border-gray-700 hover:bg-gray-800/60 text-gray-400 hover:text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="cursor-pointer flex-1 min-h-[40px] flex items-center justify-center gap-1.5 text-sm font-medium rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100/60 dark:hover:bg-gray-800/60 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <polyline points="15 18 9 12 15 6" />
@@ -142,7 +142,7 @@ export function NewsList({ items, symbol, offset, hasMore, hasPrev, loading, onL
           type="button"
           disabled={!hasMore}
           onClick={() => onLoadPage(symbol, offset + 5)}
-          className="cursor-pointer flex-1 min-h-[40px] flex items-center justify-center gap-1.5 text-sm font-medium rounded-xl border border-gray-800 hover:border-gray-700 hover:bg-gray-800/60 text-gray-400 hover:text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="cursor-pointer flex-1 min-h-[40px] flex items-center justify-center gap-1.5 text-sm font-medium rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100/60 dark:hover:bg-gray-800/60 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         >
           Next
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

@@ -35,7 +35,7 @@ export function PageLoader({ message = "", visible }: PageLoaderProps) {
         />
       </svg>
       {message && (
-        <p className="text-sm text-gray-300 font-medium">{message}</p>
+        <p className="text-sm text-white font-medium">{message}</p>
       )}
     </div>
   );

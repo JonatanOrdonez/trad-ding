@@ -125,5 +125,6 @@ export async function analyzeAsset(symbol: string): Promise<AssetAnalysis> {
     monitor: data.monitor ?? [],
     action: data.action ?? "HOLD",
     recommendation: data.recommendation ?? "",
+    ml_confidence: ml?.roc_auc ?? null,
   };
 }
