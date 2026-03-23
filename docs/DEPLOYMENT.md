@@ -74,8 +74,11 @@ Configuradas en Dokploy bajo el servicio correspondiente:
 |---|---|---|
 | `SUPABASE_URL` | Frontend + Backend | URL del proyecto Supabase |
 | `SUPABASE_KEY` | Frontend + Backend | Service role key de Supabase |
-| `NEWS_API_KEY` | Backend | newsapi.org |
-| `GROQ_API_KEY` | Backend | console.groq.com (Llama 3.1) |
+| `NEWS_API_KEY` | **Frontend** | newsapi.org — usado por `web/src/lib/services/news.ts` |
+| `GROQ_API_KEY` | **Frontend** | console.groq.com (Llama 3.1) — usado por `web/src/lib/services/analysis.ts` |
+| `UPSTASH_REDIS_REST_URL` | **Frontend** | Upstash Redis REST URL — caché de respuestas |
+| `UPSTASH_REDIS_REST_TOKEN` | **Frontend** | Token de autenticación de Upstash Redis |
+| `NEXT_PUBLIC_API_URL` | **Frontend** | URL del backend Python (solo para `/train`) |
 
 ---
 

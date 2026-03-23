@@ -91,7 +91,8 @@ Verificar antes de agregar cualquier `COPY` en el Dockerfile que el directorio o
 
 El proyecto fue reestructurado. Hoy en día:
 
-- La lógica de análisis, noticias y predicciones vive en **Next.js Route Handlers** (`src/app/api/`).
-- El **backend Python (FastAPI)** solo maneja `/train`.
+- La lógica de análisis, noticias y predicciones vive en **Next.js Route Handlers** (`web/src/app/**/route.ts`).
+- La lógica de negocio está en **`web/src/lib/services/`** (`analysis.ts`, `news.ts`, `prediction.ts`, `supabase.ts`).
+- El **backend Python (FastAPI)** solo maneja `/train` y `/health`.
 
-Al agregar nuevos endpoints o modificar la lógica de la API, buscar primero en `src/app/api/` antes de asumir que está en `backend/`.
+Al agregar nuevos endpoints o modificar la lógica de la API, buscar primero en `web/src/app/` antes de asumir que está en `backend/`.

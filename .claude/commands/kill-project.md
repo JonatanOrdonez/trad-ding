@@ -19,7 +19,7 @@ lsof -ti :3000 | xargs kill -9 2>/dev/null && echo "Port 3000 freed" || echo "Po
 ### 3. Kill any remaining uvicorn processes
 
 ```bash
-pkill -f "uvicorn backend.main:app" 2>/dev/null && echo "Uvicorn killed" || echo "No uvicorn process found"
+pkill -f "uvicorn" 2>/dev/null && echo "Uvicorn killed" || echo "No uvicorn process found"
 ```
 
 ### 4. Kill any remaining next dev processes
