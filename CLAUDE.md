@@ -7,138 +7,128 @@
 1. **ML signal** — XGBoost classifier trained on 1 year of OHLCV price data using technical indicators. Training runs remotely on Modal; the resulting model is serialized as `.onnx` and stored in Supabase Storage. Inference runs in Next.js via `onnxruntime-node`.
 2. **LLM signal** — Recent news (from NewsAPI + yfinance) fed into Llama 3.1 via Groq to produce sentiment analysis and a structured recommendation.
 
-Both signals are orchestrated in `web/src/lib/services/analysis.ts`, which calls Groq with a structured JSON prompt and returns an analysis object. **The Python backend only handles `/train` and `/health`.**
+Both signals are combined in `web/src/lib/services/analysis.ts`, which calls the LLM with a structured JSON prompt and returns an `AssetAnalysis` object. **There is no Python backend** — all API logic runs as Next.js Route Handlers.
 
 ## Commands
 
 ```bash
-# ── Python backend (FastAPI on :8000) — run from backend/ ──────────────────
-cd backend && make run            # uvicorn backend.main:app --reload
-
-# ── Next.js frontend (:3000) — run from web/ ───────────────────────────────
+# ── Next.js app (:3000) ────────────────────────────────────────────────────
 cd web && npm run dev             # next dev → http://localhost:3000
 cd web && npm run build           # production build
 cd web && npm run lint            # ESLint
+cd web && npm run test            # vitest
 
-# ── Python dependencies — run from backend/ ────────────────────────────────
-cd backend && make install dependency=<pkg>   # pip install + freeze to requirements.txt
+# ── Modal (ML training) ────────────────────────────────────────────────────
+modal deploy modal/modal_app.py   # deploy training web endpoint
 ```
 
-In development, run both servers simultaneously:
-- **Backend:** `cd backend && make run` → http://localhost:8000
-- **Frontend:** `cd web && npm run dev` → http://localhost:3000
+In development, only one server is needed:
+- **App:** `cd web && npm run dev` → http://localhost:3000
 
-Only `/train` is proxied to the Python backend via `web/next.config.js`. All other API routes are Next.js Route Handlers.
-
-Linting/formatting tools available for Python: `flake8`, `black`, `isort`. Max line length is **122** characters (configured in `backend/setup.cfg`).
+Linting/formatting tools available for Python: `flake8`, `black`, `isort`. Max line length is **122** characters (configured via `setup.cfg` if present).
 
 ### Slash commands
 
 | Command | Use when |
 |---|---|
 | `/install` | Setting up the project for the first time |
-| `/run-project` | Starting both dev servers |
-| `/kill-project` | Stopping all processes and freeing ports 3000 and 8000 |
-| `/check-env` | Validating env vars and testing service connectivity |
-| `/deploy` | Deploying via Dokploy + Modal |
+| `/run-project` | Starting the dev server |
+| `/kill-project` | Stopping all processes and freeing port 3000 |
+| `/deploy` | Deploying to Dokploy + Modal |
 
 ## Architecture
 
+> Full architecture documentation: [`docs/architecture.md`](docs/architecture.md)
+
 ```
 trad-ding/
-├── backend/                      # Python FastAPI — minimal (only /train + /health)
-│   ├── main.py                   # App init: /health and /train routes
-│   ├── env.py                    # Loads root .env — only SUPABASE_URL + SUPABASE_KEY required
-│   ├── supabase.py               # Supabase client factory
-│   ├── api/
-│   │   └── index.py              # Vercel Python serverless entry (re-exports FastAPI app)
-│   ├── services/
-│   │   └── training.py           # Fetches 1y price data, dispatches to Modal, saves model to Supabase
-│   ├── train/
-│   │   ├── features.py           # Feature engineering shared with modal_app.py
-│   │   └── modal_app.py          # Modal remote function: XGBoost → ONNX → Supabase Storage
-│   ├── requirements.txt
-│   ├── Makefile
-│   └── setup.cfg
-└── web/                          # Next.js 15 — frontend + all API logic
-    ├── next.config.js            # Proxies only /train to Python backend
-    ├── vercel.json               # Sets NEXT_PUBLIC_API_URL for Vercel
-    └── src/
-        ├── app/
-        │   ├── layout.tsx        # Root layout
-        │   ├── page.tsx          # Dashboard — Client Component, owns all UI state
-        │   ├── loading.tsx       # Skeleton loading state
-        │   ├── error.tsx         # Error boundary
-        │   ├── health/route.ts         # GET /health
-        │   ├── summary/route.ts        # GET /summary — asset list
-        │   ├── assets/route.ts         # POST /assets
-        │   ├── assets/[sym]/route.ts   # DELETE /assets/:symbol
-        │   ├── predictions/[sym]/route.ts  # GET /predictions/:symbol
-        │   ├── news/[sym]/route.ts     # GET /news/:symbol
-        │   ├── news/sync/route.ts      # GET /news/sync
-        │   └── chart/[sym]/route.ts    # GET /chart/:symbol
-        ├── components/
-        │   ├── ui/               # Toast, PageLoader
-        │   ├── layout/           # Header, SidePanel
-        │   ├── assets/           # AssetCard, FilterBar, SignalSummary, CreateAssetModal
-        │   ├── news/             # NewsList
-        │   └── analysis/         # AnalysisPanel, PriceChart
-        ├── hooks/                # useAssets, useAnalysis, useNews, useToast, useKeyboard, useTheme, useChartSummary
-        ├── lib/
-        │   ├── api.ts            # fetch wrappers for all API calls — never fetch directly in components
-        │   ├── utils.ts          # timeAgo, parseNewsRaw, localStorage helpers
-        │   ├── constants.ts      # design tokens, Tailwind class helpers
-        │   ├── cache.ts          # Upstash Redis getCached/setCached
-        │   ├── features.ts       # TypeScript port of ML feature engineering (mirrors backend/train/features.py)
-        │   └── services/
-        │       ├── analysis.ts   # Groq LLM — assembles news + ML prediction into recommendation
-        │       ├── news.ts       # NewsAPI + yfinance news sync and retrieval
-        │       ├── prediction.ts # ONNX model download from Supabase + inference
-        │       └── supabase.ts   # Supabase JS client + DB query helpers
-        └── types/                # TypeScript interfaces (asset.ts, analysis.ts, news.ts)
+├── web/                          # Next.js 15 — frontend + all API logic
+│   ├── next.config.js            # output: standalone (no proxy — no Python backend)
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx          # Dashboard — Client Component, owns all state
+│   │   │   ├── layout.tsx        # Root layout
+│   │   │   ├── loading.tsx       # Skeleton loading state
+│   │   │   ├── error.tsx         # Error boundary
+│   │   │   ├── api/train/        # POST /api/train — auth + rate limit + Modal dispatch
+│   │   │   ├── assets/           # Route Handlers: CRUD assets
+│   │   │   ├── news/             # Route Handlers: news fetch + sync
+│   │   │   ├── predictions/      # Route Handlers: ML + LLM analysis
+│   │   │   ├── summary/          # Route Handler: asset list
+│   │   │   ├── chart/            # Route Handler: price chart data
+│   │   │   └── health/           # GET /health
+│   │   ├── components/
+│   │   │   ├── ui/               # Toast, PageLoader
+│   │   │   ├── layout/           # Header, SidePanel
+│   │   │   ├── assets/           # AssetCard, FilterBar, SignalSummary, CreateAssetModal
+│   │   │   ├── news/             # NewsList
+│   │   │   └── analysis/         # AnalysisPanel, PriceChart
+│   │   ├── hooks/                # useAssets, useAnalysis, useNews, useToast, useKeyboard, useChartSummary, useTheme
+│   │   ├── lib/
+│   │   │   ├── api.ts            # Fetch wrapper for all API calls — never fetch directly in components
+│   │   │   ├── cache.ts          # Upstash Redis getCached/setCached
+│   │   │   ├── features.ts       # TS port of feature engineering (mirrors modal/features.py — keep in sync)
+│   │   │   ├── constants.ts      # Design tokens, Tailwind class helpers
+│   │   │   ├── utils.ts          # timeAgo, parseNewsRaw, localStorage helpers
+│   │   │   └── services/
+│   │   │       ├── analysis.ts   # Groq LLM call + signal combination
+│   │   │       ├── prediction.ts # ONNX inference via onnxruntime-node
+│   │   │       ├── news.ts       # News sync + retrieval from Supabase
+│   │   │       └── supabase.ts   # Supabase JS client + DB types
+│   │   └── types/                # TypeScript interfaces (asset, analysis, news)
+│   └── package.json
+├── modal/                        # Modal serverless ML training (Python)
+│   ├── modal_app.py              # Web endpoint: OHLCV → XGBoost → ONNX → Supabase Storage
+│   └── features.py               # Feature engineering (Python — mirror of web/src/lib/features.ts)
+├── Dockerfile.frontend           # Multi-stage: node:22-slim
+├── docker-compose.yml            # Single Next.js container + Traefik labels
+├── .github/workflows/
+│   └── build-and-push.yml        # CI: build → GHCR → Dokploy deploy
+└── docs/                         # Project documentation (Diataxis)
 ```
 
 ## Key data flow
 
-### Analysis (`GET /predictions/:symbol`)
-1. Next.js Route Handler at `web/src/app/predictions/[assetSymbol]/route.ts`.
-2. Calls `analyzeAsset(symbol)` from `web/src/lib/services/analysis.ts`.
-3. Fetches general news, asset-specific news, and runs ML prediction **concurrently**.
-4. If no ONNX model exists for the asset, triggers `/train` first (via Python backend → Modal).
-5. All context assembled into a prompt, sent to Groq (`llama-3.1-8b-instant`). Response is strict JSON.
-6. Result cached in Upstash Redis.
+> Detailed flow diagrams: [`docs/architecture.md`](docs/architecture.md)
 
-### Training (`GET /train`)
-1. Proxied to Python backend (`next.config.js`).
-2. `backend/services/training.py` fetches 1 year of price history from yfinance.
-3. Dispatches `train.remote(symbol, records)` to Modal function `trad-ding-training/train`.
-4. Modal function builds features (`backend/train/features.py`), trains XGBoost, converts to ONNX, uploads to Supabase Storage (`ml-models` bucket).
-5. Saves model metadata to Supabase DB (`asset_models` table).
+### Analysis (`GET /predictions/{symbol}`) — runs in Next.js
+1. Route Handler (`web/src/app/predictions/[assetSymbol]/route.ts`) checks Upstash Redis cache (TTL 60s).
+2. `analyzeAsset()` in `web/src/lib/services/analysis.ts` fetches general news, asset news, and runs ML prediction **concurrently** with `Promise.all`.
+3. If no ML model exists for the asset, analysis proceeds without ML signal (no auto-training).
+4. All context is assembled into a prompt and sent to Groq (`llama-3.1-8b-instant`, JSON mode). Response is parsed into `AssetAnalysis`.
+
+### ML inference — runs in Next.js via ONNX Runtime
+1. `predictAsset()` in `web/src/lib/services/prediction.ts` downloads the `.onnx` model from Supabase Storage.
+2. Fetches 90 days of OHLCV from Yahoo Finance, computes features via `web/src/lib/features.ts`.
+3. Runs single-row inference via `onnxruntime-node`. Returns signal (BUY/SELL) + confidence.
+
+### Training (`POST /api/train`) — runs in Next.js, protected
+1. Route Handler (`web/src/app/api/train/route.ts`) validates `X-API-Key` header, checks rate limit (1 per 30 min) and concurrency lock via Upstash Redis.
+2. Fetches 1 year of OHLCV from Yahoo Finance for each asset (sequentially).
+3. Calls Modal web endpoint (`MODAL_TRAIN_URL`) which trains XGBoost, converts to ONNX, uploads to Supabase Storage.
+4. A new `AssetModel` row is saved only if ROC AUC improved or the existing model is older than 5 days.
 
 ### ML features
 `FEATURES = ["sma_7", "sma_20", "rsi", "macd", "macd_signal", "volume_change", "price_change"]`
 
-Defined in both `backend/train/features.py` (Python, used during training) and `web/src/lib/features.ts` (TypeScript, used during inference). **Keep both in sync.**
-
+- Feature engineering exists in **both** Python (`modal/features.py`) and TypeScript (`web/src/lib/features.ts`) — **must stay in sync**.
 - Label: `1` if next day close > current close, else `0`.
-- Inference uses 60 days of price history; training uses 1 year.
+- Training uses 1 year of data; inference uses 90 days.
 
 ## Code conventions
 
-### Python (backend)
-- **Backend is intentionally minimal** — only `/train` and `/health`. Do not add business logic here.
-- **Concurrency** — blocking I/O (yfinance, Modal) runs in `ThreadPoolExecutor`. Async route handlers use `asyncio.to_thread`.
-- **Type hints are required** — all function signatures must have type hints. Use `X | None` union syntax (Python 3.10+), not `Optional[X]`.
-- **Symbols are always uppercase** — normalize with `.upper()` at the entry point.
-- **`backend/env.py` loads from the repo root `.env`** — path is `Path(__file__).parent.parent / ".env"`. Python only requires `SUPABASE_URL` and `SUPABASE_KEY`.
+### Python (Modal training only)
+- Python code lives only in `modal/` — deployed as a Modal web endpoint for XGBoost training.
+- No Python backend server. All API logic lives in Next.js Route Handlers.
 
 ### TypeScript (frontend + API)
-- All components are Client Components (`"use client"`) — state is centralized in `web/src/app/page.tsx`.
-- **API calls go through `web/src/lib/api.ts`** — never fetch directly in components.
-- **Business logic lives in `web/src/lib/services/`** — route handlers call services, not the other way around.
+- **Route Handlers** in `web/src/app/*/route.ts` handle all API logic (news, analysis, predictions, assets, training).
+- **Services** in `web/src/lib/services/` own business logic — route handlers call services, not the other way around.
+- All page components are Client Components (`"use client"`) — state is centralized in `web/src/app/page.tsx`.
+- API calls from components go through `web/src/lib/api.ts` — never fetch directly in components.
 - Design tokens (Tailwind class strings) live in `web/src/lib/constants.ts`.
-- Route handlers are in `web/src/app/**/route.ts` — when adding a new endpoint, add it there.
-- When modifying ML feature engineering, **update both** `backend/train/features.py` and `web/src/lib/features.ts`.
+- Response caching via Upstash Redis (`web/src/lib/cache.ts`) with 30-60s TTL.
+- When modifying ML feature engineering, **update both** `modal/features.py` and `web/src/lib/features.ts`.
 
 ## Database
 
@@ -156,44 +146,52 @@ Managed via **Supabase JS client** (`web/src/lib/services/supabase.ts`). No SQLA
 
 ## Environment variables
 
-### Python backend (root `.env`)
-
-Only two variables are required by the Python backend:
+All variables are set in `web/.env.local` (development) or in Dokploy (production):
 
 ```ini
-SUPABASE_URL=    # Supabase project URL
-SUPABASE_KEY=    # Supabase service role key
+SUPABASE_URL                    # Supabase project URL
+SUPABASE_KEY                    # Supabase service role key
+NEWS_API_KEY                    # newsapi.org
+GROQ_API_KEY                    # console.groq.com (Llama 3.1)
+UPSTASH_REDIS_REST_URL          # Upstash Redis REST endpoint
+UPSTASH_REDIS_REST_TOKEN        # Upstash Redis auth token
+TRAIN_API_KEY                   # Shared secret for POST /api/train + Modal auth
+MODAL_TRAIN_URL                 # Modal web endpoint URL for training
 ```
 
-For Modal (remote training): `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` (or use `modal token new`).
-
-### Next.js frontend (`web/.env.local`)
-
-```ini
-SUPABASE_URL=                   # Supabase project URL
-SUPABASE_KEY=                   # Supabase service role key
-NEWS_API_KEY=                   # newsapi.org
-GROQ_API_KEY=                   # console.groq.com
-UPSTASH_REDIS_REST_URL=         # Upstash Redis REST URL
-UPSTASH_REDIS_REST_TOKEN=       # Upstash Redis token
-NEXT_PUBLIC_API_URL=http://localhost:8000  # Python backend URL (only /train uses it)
-```
+See `web/.env.example` for the full template with descriptions.
 
 ## External services
 
 | Service | Purpose | Used in |
 |---|---|---|
-| Supabase DB | Persistent storage (assets, models, news) | `web/src/lib/services/supabase.ts` |
-| Supabase Storage | Store/retrieve `.onnx` model files | `web/src/lib/services/prediction.ts`, `backend/train/modal_app.py` |
-| Groq | LLM inference (Llama 3.1) | `web/src/lib/services/analysis.ts` |
-| NewsAPI | General business news | `web/src/lib/services/news.ts` |
-| yfinance | Asset-specific news + price history | `web/src/lib/services/news.ts`, `backend/services/training.py` |
-| Modal | Remote XGBoost training | `backend/services/training.py`, `backend/train/modal_app.py` |
-| Upstash Redis | Response caching | `web/src/lib/cache.ts` |
+| Supabase (PostgreSQL) | Persistent storage (assets, news, model registry) | `web/src/lib/services/supabase.ts` |
+| Supabase Storage | Store/retrieve `.onnx` model files | `web/src/lib/services/prediction.ts` (download), `modal/modal_app.py` (upload) |
+| Groq | LLM inference (Llama 3.1 8B Instant) | `web/src/lib/services/analysis.ts` |
+| NewsAPI | General business headlines | `web/src/lib/services/news.ts` |
+| Yahoo Finance | Asset-specific news + OHLCV price history | `web/src/lib/services/news.ts`, `prediction.ts`, `api/train/route.ts` |
+| Modal | Serverless ML training (XGBoost → ONNX) | `web/src/app/api/train/route.ts` → `modal/modal_app.py` |
+| Upstash Redis | Response caching + training rate limit/lock | `web/src/lib/cache.ts` |
 
-## Frontend (`web/src/`)
+## Frontend (`web/`)
 
 Next.js 15 App Router, TypeScript, Tailwind CSS v3. The dashboard at `web/src/app/page.tsx` is a Client Component that owns all UI state and delegates to hooks and sub-components.
+
+### API Route Handlers
+
+All API logic runs as Next.js Route Handlers (server-side). The frontend is both the UI and the API server:
+
+| Route | Method | Description |
+|---|---|---|
+| `/assets` | POST | Create asset (validates via Yahoo Finance) |
+| `/assets/{symbol}` | DELETE | Delete asset + models + news |
+| `/news/{symbol}` | GET | Fetch news (auto-syncs if empty) |
+| `/news/sync` | GET | Sync all news sources |
+| `/predictions/{symbol}` | GET | Full analysis (ML + LLM), cached 60s |
+| `/summary` | GET | Asset list |
+| `/chart/{symbol}` | GET | Price chart data + indicators |
+| `/health` | GET | Healthcheck |
+| `/api/train` | POST | ML training for all assets (auth + rate limit + lock) |
 
 ### Mobile considerations
 
@@ -204,41 +202,59 @@ Next.js 15 App Router, TypeScript, Tailwind CSS v3. The dashboard at `web/src/ap
 
 ## Sistema de documentación
 
-Al inicio de cada tarea, leer `docs/INDEX.md` para saber qué documentación existe y cuándo consultarla.
+Al inicio de cada tarea, leer `INDEX.md` (catálogo maestro en raíz) y `docs/INDEX.md` (índice detallado).
 
-### Archivos clave
+### Nivel 1: Repo (`docs/`) — Documentación técnica (Diataxis)
 
-| Archivo | Contenido |
+| Tipo | Archivo | Contenido |
+|---|---|---|
+| Explanation | `docs/architecture.md` | Arquitectura completa: componentes, flujos, modelo de datos, deployment. |
+| How-to | `docs/DEPLOYMENT.md` | Producción, CI/CD, Dokploy, env vars, troubleshooting. |
+| Reference | `docs/LEARNINGS.md` | Lecciones no obvias: Docker, Next.js, Alpine, Traefik, GHCR, onnxruntime-node. |
+
+### Nivel 2: Vault (Obsidian) — Visión de producto y aprendizajes transversales
+
+| Documento | Propósito |
 |---|---|
-| `docs/INDEX.md` | Índice de toda la documentación. Punto de entrada. |
-| `docs/DEPLOYMENT.md` | Arquitectura de producción, CI/CD, Dokploy, variables de entorno, redeploy y troubleshooting. |
-| `docs/LEARNINGS.md` | Lecciones no obvias: Docker, Next.js build-time, Alpine vs glibc, Traefik, GHCR, onnxruntime-node. |
+| `_Projects/TradDing.md` | Visión de producto, roadmap, decisiones estratégicas. |
+| `_Learning/*.md` | Aprendizajes transversales (Docker, Next.js, ML, infra) que aplican a múltiples proyectos. |
 
 ### Cuándo actualizar la documentación
 
-- Al completar una tarea de deploy o infraestructura: actualizar `docs/DEPLOYMENT.md` si algo cambia.
-- Si descubres algo no obvio sobre el stack: agregar una entrada a `docs/LEARNINGS.md`.
-- Si creas un documento nuevo en `docs/`: registrarlo en `docs/INDEX.md`.
+- Al completar una tarea de deploy o infraestructura: actualizar `docs/DEPLOYMENT.md`.
+- Si descubres algo no obvio sobre el stack: agregar a `docs/LEARNINGS.md`.
+- Si cambia la arquitectura (nuevos servicios, flujos, componentes): actualizar `docs/architecture.md`.
+- Si creas un documento nuevo en `docs/`: registrarlo en `docs/INDEX.md` y `INDEX.md`.
+- Si una decisión es estratégica o de producto: documentar en el vault (`_Projects/TradDing.md`).
 
 ---
 
 ## Deployment
 
-The app is self-hosted on **Hetzner** using **Dokploy** + **Docker Compose** + **Traefik** (SSL). See `docs/DEPLOYMENT.md` for full details.
+> Full deployment guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+### Production (Dokploy on Hetzner)
+
+- **Server:** Hetzner Worker `46.62.193.225`
+- **Orchestrator:** Dokploy manages `docker-compose.yml`
+- **Reverse proxy:** Traefik with ACME (Let's Encrypt)
+- **Domains:** `trad-ding.com`, `api.trad-ding.com` (both route to the single Next.js container)
+- **Registry:** GHCR (`ghcr.io/jonatanordonez/trad-ding/frontend:latest`)
 
 ### CI/CD
 
-Pushing to `main` triggers GitHub Actions (`.github/workflows/`) which builds and pushes Docker images to GHCR. Dokploy then pulls and restarts the services via webhook.
+```
+git push origin main → GitHub Actions → Build images → GHCR → Dokploy webhook → deploy
+```
 
-### Docker images
+### Docker image
 
 - **Frontend** (`Dockerfile.frontend`): `node:22-slim` — must use slim (not Alpine) due to `onnxruntime-node` glibc requirement.
-- **Backend** (`Dockerfile.backend`): `python:3.12-slim`.
 
 ### Modal (ML training)
 
 ```bash
-modal deploy backend/train/modal_app.py
+modal deploy modal/modal_app.py
 ```
 
-Registers the function as `trad-ding-training/train`. Called at runtime by the backend when `/train` is triggered.
+Registers the function as `trad-ding-training/train` and creates a web endpoint URL. Store the URL as `MODAL_TRAIN_URL` env var. Called by `POST /api/train` Route Handler.

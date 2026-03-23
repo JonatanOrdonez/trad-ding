@@ -1,49 +1,27 @@
 # Run project locally
 
-Start the trad-ding development servers. Run this after the project is already installed (see `/install`).
+Start the trad-ding development server. Run this after the project is already installed (see `/install`).
 
-trad-ding requires **two servers** running simultaneously:
-- **Backend** — FastAPI on http://localhost:8000
-- **Frontend** — Next.js on http://localhost:3000
-
-The frontend handles most API routes via Next.js Route Handlers. Only `/train` is proxied to the backend.
+trad-ding is a single Next.js app that handles both the UI and all API logic. **Only one server is needed.**
 
 ## Steps
-
-### Terminal 1 — Python backend
-
-Run from the **`backend/`** subdirectory. The Makefile handles changing to the repo root.
-
-```bash
-source .venv/bin/activate
-cd backend && make run
-```
-
-The backend will be available at **http://localhost:8000**.
-
-- Health check: http://localhost:8000/health
-- API docs: http://localhost:8000/docs
-
-> **Note:** Do NOT run `make db-upgrade` on every start — `alembic.ini` is gitignored. The DB schema already exists on Supabase. Only run migrations when schema changes have been made.
-
-### Terminal 2 — Next.js frontend
-
-Run from the **`web/`** subdirectory.
 
 ```bash
 cd web && npm run dev
 ```
 
-The frontend will be available at **http://localhost:3000**.
+The app will be available at **http://localhost:3000**.
 
-Only the `/train` endpoint is proxied to `localhost:8000` via `next.config.js`. All other API routes (`/assets`, `/predictions/*`, `/news/*`, `/summary`, `/chart/*`, `/health`) are handled by Next.js Route Handlers in `web/src/app/`.
+- Health check: http://localhost:3000/health
+- All API routes (`/summary`, `/predictions/*`, `/news/*`, `/assets`, `/chart/*`) are Next.js Route Handlers — no separate backend needed.
+- ML training (`POST /api/train`) calls a Modal web endpoint — no local Python server needed.
 
 ---
 
-To stop either server, press `CTRL+C` in its terminal. To forcefully kill all processes and free ports, use `/kill-project`.
+To stop the server, press `CTRL+C`. To forcefully kill all processes and free port 3000, use `/kill-project`.
 
 ## Troubleshooting
 
-- **`RuntimeError: Environment variable 'X' is not set`** — the `.env` file must be at the repo root. `backend/env.py` loads it from `Path(__file__).parent.parent / ".env"` (i.e., one level above `backend/`).
-- **`Address already in use` on port 8000 or 3000** — kill the existing process: `kill $(lsof -t -i:8000)` or use `/kill-project`.
-- **`No 'script_location' key found` (alembic error)** — `alembic.ini` is gitignored; skip `make db-upgrade` unless you need to run migrations.
+- **`Address already in use` on port 3000** — use `/kill-project` to free the port.
+- **`Module not found` or import errors** — run `cd web && npm install` to install dependencies.
+- **Environment variable errors** — make sure `web/.env.local` exists with all required variables. See `web/.env.example` for the full template.

@@ -1,5 +1,5 @@
 import type { Asset, CreateAssetRequest } from "@/types/asset";
-import type { AssetAnalysis, TrainResponse } from "@/types/analysis";
+import type { AssetAnalysis } from "@/types/analysis";
 import type { NewsResponse, SyncResponse } from "@/types/news";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -39,6 +39,3 @@ export function syncNews(): Promise<SyncResponse> {
   return request<SyncResponse>("/news/sync");
 }
 
-export function trainAll(): Promise<TrainResponse> {
-  return request<TrainResponse>("/train");
-}

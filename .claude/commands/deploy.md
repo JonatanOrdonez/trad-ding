@@ -1,96 +1,148 @@
 # Deploy trad-ding
 
-trad-ding has **two separate deployment targets**:
+trad-ding tiene **dos targets de deploy**:
 
-| Target | What it deploys | Tool |
+| Target | Qué despliega | Cómo |
 |---|---|---|
-| **Vercel** | Next.js frontend + FastAPI Python serverless | `vercel --prod` |
-| **Modal** | XGBoost training function | `modal deploy backend/train/modal_app.py` |
+| **Dokploy (Hetzner)** | Next.js app (UI + toda la API) | `git push origin main` — CI/CD automático |
+| **Modal** | Función de ML training | `modal deploy modal/modal_app.py` |
+
+Ver `docs/DEPLOYMENT.md` para detalles completos de infraestructura.
 
 ---
 
-## Before deploying — checklist
+## Flujo normal (recomendado)
 
-Make sure these are set in your Vercel project environment variables:
-
-```
-DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
-NEWS_API_KEY
-GROQ_API_KEY
-SUPABASE_URL
-SUPABASE_KEY
+```bash
+git push origin main
 ```
 
-Add them in **Vercel Dashboard → Project → Settings → Environment Variables**.
+GitHub Actions (`.github/workflows/build-and-push.yml`) hace automáticamente:
+1. Build de la imagen Docker desde `Dockerfile.frontend`
+2. Push a GHCR (`ghcr.io/jonatanordonez/trad-ding/frontend:latest`)
+3. Dispara el webhook de Dokploy → `docker pull` + restart del contenedor
 
-For Modal, secrets are passed via `modal.Secret.from_dotenv()` — your local `.env` is used at deploy time.
+Monitorear el build en la pestaña **Actions** de GitHub.
 
 ---
 
-## 1. Build check before deploy
-
-Run the production build locally to catch any errors before pushing:
+## 1. Build check antes de hacer push
 
 ```bash
-npm run build
+cd web && npm run build
 ```
 
-Fix any TypeScript or build errors before proceeding.
+Corregir cualquier error de TypeScript o build antes de continuar.
 
 ---
 
-## 2. Deploy to Vercel
-
-### Install Vercel CLI (first time only)
+## 2. Deploy a Dokploy
 
 ```bash
-npm install -g vercel
+git push origin main
 ```
 
-### Login and deploy
+### Redeploy manual (si es necesario)
+
+Via Dokploy API:
 
 ```bash
-vercel login
-vercel --prod
+curl -X POST "https://dokploy.trad-ding.com/api/compose.redeploy" \
+  -H "Authorization: Bearer <DOKPLOY_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"composeId": "M1htexJlpnKvp5xeyr3BN"}'
 ```
 
-Vercel auto-detects Next.js as the framework (`vercel.json` sets `"framework": "nextjs"`).
-The Python serverless function at `api/index.py` is built with `@vercel/python@4`.
-API routes (`/summary`, `/predictions/*`, `/news/*`, etc.) are rewritten to `api/index.py` via `vercel.json`.
+Via panel web:
+1. Abrir https://dokploy.trad-ding.com
+2. Seleccionar el proyecto TradDing
+3. Click en **Redeploy**
 
-### Verify deployment
+### Verificar el deploy
 
 ```bash
-curl https://your-project.vercel.app/health
+curl https://trad-ding.com/health
+# → {"status":"OK"}
 ```
-
-Expected response: `{"status": "ok"}`.
-
-Also open the Vercel URL in the browser and verify the Next.js dashboard loads.
 
 ---
 
-## 3. Deploy ML training function to Modal
+## 3. Deploy de la función de ML training a Modal
+
+Solo necesario cuando cambia `modal/modal_app.py` o `modal/features.py`:
 
 ```bash
-modal deploy backend/train/modal_app.py
+modal deploy modal/modal_app.py
 ```
 
-This registers the function as `trad-ding-training/train` in your Modal workspace.
-
-### Verify Modal deployment
+Crea/actualiza el web endpoint e imprime la nueva URL. Si la URL cambia, actualizar `MODAL_TRAIN_URL` en las variables de entorno de Dokploy.
 
 ```bash
 modal app list
+# trad-ding-training debe aparecer como deployed
 ```
-
-You should see `trad-ding-training` listed as deployed.
 
 ---
 
-## Notes
+## Variables de entorno en producción
 
-- **Database migrations are not run automatically on deploy.** Run `make db-upgrade` manually against your production DB before first deploy or after schema changes.
-- The frontend is served by Vercel's Next.js CDN. The backend runs as a Python serverless function on each API request.
-- The backend calls Modal **at runtime** when `/train` or `/predictions/{symbol}` (first run, no model exists) is triggered. Both Vercel and Modal must be deployed and working for full functionality.
-- Do **not** add a `builds` entry for Next.js in `vercel.json` — Vercel handles it automatically via `"framework": "nextjs"`.
+Configuradas en Dokploy bajo el servicio correspondiente:
+
+| Variable | Descripción |
+|---|---|
+| `SUPABASE_URL` | URL del proyecto Supabase |
+| `SUPABASE_KEY` | Service role key de Supabase |
+| `NEWS_API_KEY` | newsapi.org |
+| `GROQ_API_KEY` | console.groq.com (Llama 3.1) |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis auth token |
+| `TRAIN_API_KEY` | Secreto compartido para `POST /api/train` + Modal auth |
+| `MODAL_TRAIN_URL` | URL del web endpoint de Modal para training |
+
+---
+
+## Troubleshooting
+
+### SSL / certificados Traefik
+
+Si el certificado no se genera o está expirado:
+
+```bash
+ssh root@46.62.193.225
+docker restart traefik
+```
+
+### GHCR: error al hacer pull en el servidor
+
+```bash
+ssh root@46.62.193.225
+echo "<GITHUB_TOKEN>" | docker login ghcr.io -u <GITHUB_USER> --password-stdin
+```
+
+Solo hace falta hacerlo una vez. El token necesita el scope `read:packages`.
+
+### Contenedor no levanta / error en logs
+
+```bash
+ssh root@46.62.193.225
+docker ps -a                       # ver estado de contenedores
+docker logs <container_id>         # ver logs
+docker compose -f <file> up -d     # relanzar manualmente si hace falta
+```
+
+### Build falla por variables de entorno
+
+Next.js evalúa los Route Handlers en tiempo de build. Si faltan variables, el build falla. El `Dockerfile.frontend` ya pasa valores dummy — si agregas una nueva variable de entorno usada al inicializar un módulo, también agrégala como `ARG` en el Dockerfile:
+
+```dockerfile
+ARG NUEVA_VAR=placeholder
+ENV NUEVA_VAR=$NUEVA_VAR
+```
+
+---
+
+## Notas
+
+- **Sin migraciones de base de datos** — el esquema se gestiona directamente en Supabase.
+- **Contenedor único** — Next.js maneja todo. No hay backend separado que desplegar.
+- **Feature engineering** — si cambias `modal/features.py`, actualiza también `web/src/lib/features.ts` antes de hacer deploy.

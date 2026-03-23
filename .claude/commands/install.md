@@ -4,82 +4,46 @@ Run the following steps to set up trad-ding on the local machine. Execute them s
 
 ## Project structure
 
-The repo is a monorepo with two sub-projects:
+The app is a single Next.js project under `web/`. There is no Python backend server.
 
-- **`backend/`** — FastAPI app. Has its own `requirements.txt`, `Makefile`, and `setup.cfg`.
-- **`web/`** — Next.js frontend. Has its own `package.json` and `node_modules/`.
-
-All commands below must be run from the **repo root** unless noted otherwise.
+- **`web/`** — Next.js 15 app (frontend + API). All development work happens here.
+- **`modal/`** — Python code for ML training (deployed to Modal, not run locally).
 
 ## Steps
 
-### 1. Check Python version
-
-```bash
-python3 --version
-```
-
-The project requires **Python 3.12 or higher**. If missing:
-
-```bash
-brew install python@3.12
-```
-
-### 2. Create and activate virtual environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Confirm the venv is active — the prompt should show `(.venv)`.
-
-### 3. Install Python dependencies
-
-Dependencies live in `backend/requirements.txt`, not the repo root.
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-### 4. Check Node.js version
+### 1. Check Node.js version
 
 ```bash
 node --version
 npm --version
 ```
 
-The project requires **Node.js 18 or higher**. If missing:
+The project requires **Node.js 22 or higher** (`onnxruntime-node` requires Node 22+). If missing:
 
 ```bash
 brew install node
 ```
 
-### 5. Install Node.js dependencies
-
-The frontend lives in `web/`, so run `npm install` there.
+### 2. Install Node.js dependencies
 
 ```bash
 cd web && npm install
 ```
 
-### 6. Set up environment variables
+### 3. Set up environment variables
 
-Check if a `.env` file already exists at the repo root:
+Copy the example file:
 
 ```bash
-ls -la .env
+cp web/.env.example web/.env.local
 ```
 
-If it does not exist, create it with the following template and fill in the values:
+Then fill in the values in `web/.env.local`:
 
 ```ini
-# PostgreSQL (Supabase connection pooler)
-DB_USER=
-DB_PASSWORD=
-DB_HOST=
-DB_PORT=6543
-DB_NAME=postgres
+# https://supabase.com/ (service role key)
+SUPABASE_URL=
+SUPABASE_KEY=
 
 # https://newsapi.org/
 NEWS_API_KEY=
@@ -87,58 +51,51 @@ NEWS_API_KEY=
 # https://console.groq.com/
 GROQ_API_KEY=
 
-# https://supabase.com/ (service role key)
-SUPABASE_URL=
-SUPABASE_KEY=
+# https://upstash.com/ (Redis REST)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 
-# https://modal.com/ (optional, only needed for ML training)
-MODAL_TOKEN_ID=
-MODAL_TOKEN_SECRET=
+# Shared secret for POST /api/train — generate with: openssl rand -hex 32
+TRAIN_API_KEY=
+
+# URL from `modal deploy modal/modal_app.py` output
+MODAL_TRAIN_URL=
 ```
 
-For Modal authentication (alternative to env vars):
+> The app will silently fail on API calls if any variable is missing. Check `web/.env.example` for descriptions.
+
+### 4. (Optional) Set up Modal for ML training
+
+If you need to run ML training locally:
 
 ```bash
+pip install modal
 modal token new
+modal deploy modal/modal_app.py
 ```
 
-### 7. Run database migrations
+Copy the web endpoint URL printed by `modal deploy` into `MODAL_TRAIN_URL` in `web/.env.local`.
 
-> **Note:** `alembic.ini` and the migration source files are **gitignored** and not committed to the repo. The database schema on Supabase is already applied. Only run this step if you are setting up a brand new database or if schema changes have been made.
+### 5. Verify the installation
 
-Migrations are managed from `backend/` using the Makefile:
-
-```bash
-cd backend && make db-upgrade
-```
-
-If `alembic.ini` is missing (first-time setup on a new machine), you will need to restore it or re-initialize Alembic before running migrations.
-
-### 8. Verify the installation
-
-Start both servers:
+Start the dev server:
 
 ```bash
-# Terminal 1 — backend (from backend/ directory)
-source .venv/bin/activate
-cd backend && make run
-# → http://localhost:8000
-
-# Terminal 2 — frontend (from web/ directory)
 cd web && npm run dev
 # → http://localhost:3000
 ```
 
-- Frontend: http://localhost:3000
-- API health check: http://localhost:8000/health
-- API docs: http://localhost:8000/docs
+Check the health endpoint:
+
+```bash
+curl http://localhost:3000/health
+# → {"status":"OK"}
+```
 
 ## Troubleshooting
 
-- **`RuntimeError: Environment variable 'X' is not set`** — a required variable is missing from `.env`. The backend loads `.env` via `python-dotenv`; make sure the file is at the repo root. The backend fails fast on startup if any variable is absent.
-- **`pip install -r requirements.txt` not found** — dependencies are in `backend/requirements.txt`, not the root. Run `pip install -r backend/requirements.txt`.
-- **`npm install` not found / wrong directory** — the frontend is in `web/`. Run `cd web && npm install`.
-- **`No 'script_location' key found` (alembic error)** — `alembic.ini` is gitignored and missing. The DB schema already exists on Supabase; skip migrations unless you need to apply new ones.
-- **Database connection error** — verify the `DB_*` values in `.env` are correct. The project uses Supabase's connection pooler on port `6543`.
-- **`modal: command not found`** — Modal is installed as part of `backend/requirements.txt`. Make sure the venv is active.
-- **API calls fail from frontend** — make sure the backend is running on `:8000`; `next.config.js` in `web/` proxies all API routes there.
+- **`Module not found` errors** — run `cd web && npm install` to make sure all dependencies are installed.
+- **API calls return errors** — verify all variables in `web/.env.local` are set. Missing `SUPABASE_URL` or `SUPABASE_KEY` will break most endpoints.
+- **`UPSTASH_REDIS_REST_URL` missing** — caching and training rate-limiting won't work. Create a free Upstash Redis database at https://upstash.com.
+- **`onnxruntime-node` fails to load** — make sure you're using Node 22+. Do not use Alpine Linux (use `node:22-slim` in Docker).
+- **`modal: command not found`** — install with `pip install modal` in a Python venv.

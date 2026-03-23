@@ -25,13 +25,3 @@ export interface ChartRow {
   sma_20: number;
   rsi: number;
 }
-
-export interface TrainResult {
-  symbol: string;
-  error?: string;
-  improved?: boolean;
-}
-
-export interface TrainResponse {
-  results: TrainResult[];
-}

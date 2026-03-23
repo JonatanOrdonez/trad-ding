@@ -12,7 +12,7 @@ image = (
         "supabase",
         "numpy",
     )
-    .add_local_file("backend/train/features.py", "/root/features.py")
+    .add_local_file("modal/features.py", "/root/features.py")
 )
 
 BUCKET = "ml-models"
@@ -23,7 +23,8 @@ BUCKET = "ml-models"
     secrets=[modal.Secret.from_dotenv()],
     timeout=300,
 )
-def train(symbol: str, records: list[dict]) -> dict:
+@modal.web_endpoint(method="POST")
+def train(item: dict) -> dict:
     import os
     import sys
     from datetime import datetime, timezone
@@ -33,6 +34,15 @@ def train(symbol: str, records: list[dict]) -> dict:
     from sklearn.model_selection import train_test_split
     from supabase import create_client
     from xgboost import XGBClassifier
+
+    # Validate shared secret
+    api_key = item.get("api_key", "")
+    expected_key = os.environ.get("TRAIN_API_KEY", "")
+    if not expected_key or api_key != expected_key:
+        return {"error": "Forbidden"}
+
+    symbol = item["symbol"]
+    records = item["records"]
 
     sys.path.insert(0, "/root")
     from features import FEATURES, build_features, compute_balanced_accuracy

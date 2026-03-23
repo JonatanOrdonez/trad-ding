@@ -5,13 +5,12 @@ import { useState, useRef } from "react";
 interface HeaderProps {
   onAddAsset: () => void;
   onSyncNews: () => Promise<void>;
-  onTrainAll: () => Promise<void>;
   onAnalyzeAll: () => Promise<void>;
   isDark: boolean;
   onToggleTheme: () => void;
 }
 
-export function Header({ onAddAsset, onSyncNews, onTrainAll, onAnalyzeAll, isDark, onToggleTheme }: HeaderProps) {
+export function Header({ onAddAsset, onSyncNews, onAnalyzeAll, isDark, onToggleTheme }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -96,19 +95,6 @@ export function Header({ onAddAsset, onSyncNews, onTrainAll, onAnalyzeAll, isDar
                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                   </svg>
                   Sync news
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMenuAction(onTrainAll)}
-                  className="cursor-pointer w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
-                  role="menuitem"
-                >
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                  Train all
                 </button>
                 <div className="mx-3 my-1 border-t border-gray-100 dark:border-gray-800" />
                 <button

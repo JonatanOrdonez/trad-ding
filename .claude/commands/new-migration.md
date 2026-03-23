@@ -1,97 +1,62 @@
-# Create a new database migration
+# Database schema changes
 
-Use this whenever you change a SQLModel table definition in `backend/models/`.
-
----
-
-## When to use
-
-- Added, renamed, or removed a column on an existing model
-- Created a new SQLModel table
-- Changed a column type, constraint, or index
-- Need to insert seed data into the DB
+trad-ding uses **Supabase** as its database. There is no SQLAlchemy, no Alembic, and no migration files in this repo. Schema changes are made directly in Supabase.
 
 ---
 
-## Steps
+## When to use this
 
-### 1. Make your model change
-
-Edit the relevant file in `backend/models/`. Example — adding a column to `Asset`:
-
-```python
-# backend/models/asset.py
-class Asset(SQLModel, table=True):
-    ...
-    sector: str | None = Field(default=None)   # ← new column
-```
-
-### 2. Generate the migration automatically
-
-```bash
-make db-migrate msg="add sector to assets"
-```
-
-This runs `alembic revision --autogenerate -m "..."` and creates a new file in `migrations/versions/`.
-
-> **Always review the generated file** before applying. Alembic sometimes misses renames or generates unintentional `DROP` statements.
-
-### 3. Review the generated migration
-
-```bash
-ls -t migrations/versions/ | head -1
-```
-
-Check the `upgrade()` and `downgrade()` functions are correct.
-
-### 4. Apply the migration
-
-```bash
-make db-upgrade
-```
-
-### 5. Verify
-
-```bash
-make run   # start the backend and confirm no errors
-```
+- Adding, renaming, or removing a column on an existing table
+- Creating a new table
+- Changing a column type, constraint, or index
+- Inserting seed data
 
 ---
 
-## Seed data (blank migration)
+## Tables
 
-If you only need to insert initial data without a schema change:
-
-```bash
-make db-seed msg="seed default assets"
-```
-
-This creates a blank migration. Write your `op.execute(...)` statements manually inside it.
-
----
-
-## Rollback
-
-To undo the last migration:
-
-```bash
-source .venv/bin/activate
-alembic downgrade -1
-```
-
-To go back to a specific revision:
-
-```bash
-alembic downgrade <revision_id>
-```
-
----
-
-## Common mistakes
-
-| Mistake | Fix |
+| Table | Description |
 |---|---|
-| Forgot to activate `.venv` | `source .venv/bin/activate` first |
-| Migration generates empty `upgrade()` | Did you save the model file? Check for import errors. |
-| `target_metadata` not seeing the new model | Make sure the model is imported in `migrations/env.py` |
-| Applied to wrong DB | Check `DB_HOST` and `DB_NAME` in your `.env` |
+| `assets` | Tracked assets (`id`, `symbol`, `name`, `asset_type`, `yfinance_symbol`) |
+| `asset_models` | Trained ML model registry (`asset_id`, `storage_path`, `metrics JSONB`, `is_active`, `created_at`) |
+| `asset_news` | Cached news items (`asset_id`, `content_id`, `source_type`, `content JSONB`, `created_at`) |
+
+TypeScript types for these tables are in `web/src/lib/services/supabase.ts`.
+
+---
+
+## How to make a schema change
+
+### 1. Apply the change in Supabase
+
+Go to your Supabase project → **Table Editor** or **SQL Editor** and run the migration manually:
+
+```sql
+-- Example: add a column
+ALTER TABLE assets ADD COLUMN sector TEXT;
+
+-- Example: create a new table
+CREATE TABLE asset_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id UUID REFERENCES assets(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### 2. Update the TypeScript types
+
+Update the DB types in `web/src/lib/services/supabase.ts` to match the new schema.
+
+### 3. Update any affected services
+
+Update `web/src/lib/services/*.ts` files that query the changed table.
+
+---
+
+## Tips
+
+- **Primary keys** are UUIDs generated server-side with `gen_random_uuid()`.
+- **`asset_models.is_active`** — only one active model per asset. Before inserting a new model, set all existing ones to `is_active = false`.
+- **`asset_news.content_id`** — used as a deduplication key (URL or source UUID). Always set this when inserting news.
+- Apply changes to **production** Supabase before deploying code that depends on them.
