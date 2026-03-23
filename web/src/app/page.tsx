@@ -30,7 +30,7 @@ import { useTheme } from "@/hooks/useTheme";
 
 // Lib
 import { loadAnalysis, saveAnalysis } from "@/lib/utils";
-import { syncNews as apiSyncNews, trainAll as apiTrainAll } from "@/lib/api";
+import { syncNews as apiSyncNews } from "@/lib/api";
 
 // Types
 import type { Asset, LocalAnalysis, CreateAssetRequest } from "@/types/asset";
@@ -43,7 +43,7 @@ type PanelMode =
   | { type: "analysis"; symbol: string; data: AssetAnalysis }
   | { type: "analysis-error"; symbol: string; message: string }
   | { type: "news"; symbol: string }
-  | { type: "train-results"; rows: Array<{ symbol: string; improved?: boolean; error?: string }> };
+;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getLocalAnalyses(assets: Asset[]): Record<string, LocalAnalysis | null> {
@@ -153,19 +153,6 @@ export default function DashboardPage() {
       showToast(res.message ?? "News synced successfully.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to sync news.", "error");
-    } finally {
-      setLoaderMessage(null);
-    }
-  }, [showToast]);
-
-  // ── Train all ───────────────────────────────────────────────────────────────
-  const handleTrainAll = useCallback(async () => {
-    setLoaderMessage("Training all models...");
-    try {
-      const res = await apiTrainAll();
-      setPanel({ type: "train-results", rows: res.results });
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Training failed.", "error");
     } finally {
       setLoaderMessage(null);
     }
@@ -283,31 +270,6 @@ export default function DashboardPage() {
     if (newsError) {
       panelContent = <AnalysisPanelError message={newsError} />;
     }
-  } else if (panel.type === "train-results") {
-    panelTitle = "Training results";
-    panelContent = (
-      <div>
-        {panel.rows.map((r) => (
-          <div
-            key={r.symbol}
-            className="flex items-center justify-between py-2.5 border-b border-gray-200 dark:border-gray-800 last:border-0"
-          >
-            <span className="text-sm font-medium">{r.symbol}</span>
-            <span
-              className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                r.error
-                  ? "bg-red-500/15 text-red-400"
-                  : r.improved
-                  ? "bg-green-500/15 text-green-400"
-                  : "bg-gray-700 text-gray-400"
-              }`}
-            >
-              {r.error ? "Error" : r.improved ? "Improved" : "No change"}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
   }
 
   // ── Empty state ───────────────────────────────────────────────────────────────
@@ -320,7 +282,6 @@ export default function DashboardPage() {
       <Header
         onAddAsset={() => setCreateOpen(true)}
         onSyncNews={handleSyncNews}
-        onTrainAll={handleTrainAll}
         onAnalyzeAll={handleAnalyzeAll}
         isDark={dark}
         onToggleTheme={toggleTheme}

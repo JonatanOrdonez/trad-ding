@@ -32,22 +32,7 @@ RUN npm run build
 
 ---
 
-## 3. `python:3.12-slim` no tiene `curl`
-
-**Problema:** El `HEALTHCHECK` del Dockerfile del backend usaba `curl`, que no está instalado en `python:3.12-slim`.
-
-**Solución:** Usar Python directamente para el healthcheck:
-
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-```
-
-Alternativa: instalar `curl` con `apt-get install -y curl`, pero agrega peso innecesario a la imagen.
-
----
-
-## 4. GHCR necesita `docker login` en el servidor antes del primer deploy
+## 3. GHCR necesita `docker login` en el servidor antes del primer deploy
 
 **Problema:** Dokploy no puede bajar imágenes de un repositorio privado de GHCR si el daemon de Docker en el servidor no está autenticado.
 
@@ -62,7 +47,7 @@ El token de GitHub necesita el scope `read:packages`. Las credenciales quedan gu
 
 ---
 
-## 5. Traefik: reiniciar para reintentar generación de certificado ACME
+## 4. Traefik: reiniciar para reintentar generación de certificado ACME
 
 **Problema:** El certificado SSL de Let's Encrypt no se generó automáticamente al hacer el primer deploy (Traefik falló silenciosamente en el challenge ACME).
 
@@ -77,7 +62,7 @@ Esto suele resolver el problema si el DNS ya apunta correctamente al servidor.
 
 ---
 
-## 6. La carpeta `public/` no existe en este proyecto
+## 5. La carpeta `public/` no existe en este proyecto
 
 **Problema:** El `Dockerfile` del frontend incluía `COPY public/ ./public/`, lo que causaba un error de build porque la carpeta no existe en el repositorio.
 
@@ -87,11 +72,10 @@ Verificar antes de agregar cualquier `COPY` en el Dockerfile que el directorio o
 
 ---
 
-## 7. Estructura del proyecto: la mayoría de la lógica API está en Next.js Route Handlers
+## 6. Arquitectura: toda la lógica vive en Next.js
 
-El proyecto fue reestructurado. Hoy en día:
+El proyecto es un monolito Next.js. No hay backend Python separado.
 
-- La lógica de análisis, noticias y predicciones vive en **Next.js Route Handlers** (`src/app/api/`).
-- El **backend Python (FastAPI)** solo maneja `/train`.
-
-Al agregar nuevos endpoints o modificar la lógica de la API, buscar primero en `src/app/api/` antes de asumir que está en `backend/`.
+- Toda la lógica API (assets, news, predictions, training) vive en **Next.js Route Handlers** (`web/src/app/`).
+- El training se orquesta desde `POST /api/train` (Next.js) → Modal web endpoint (Python serverless).
+- El código Python solo existe en `modal/` para la función de entrenamiento en Modal.

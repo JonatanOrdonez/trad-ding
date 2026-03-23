@@ -5,13 +5,14 @@
 ```
 Internet
    │
-   ├── trad-ding.com        → Frontend (Next.js)   — contenedor en Worker
-   └── api.trad-ding.com    → Backend  (FastAPI)    — contenedor en Worker
+   ├── trad-ding.com        → Next.js container (UI + API + training)
+   └── api.trad-ding.com    → Same Next.js container
 ```
 
 - **Servidor:** Hetzner Worker `46.62.193.225`
 - **Reverse proxy / SSL:** Traefik con ACME (Let's Encrypt). Los certificados se generan automáticamente al primer request.
-- **Orquestador:** Dokploy gestiona los servicios y lanza `docker compose`.
+- **Orquestador:** Dokploy gestiona el servicio y lanza `docker compose`.
+- **Contenedor único:** Next.js 15 standalone maneja toda la lógica (UI, API, training orchestration).
 
 ---
 
@@ -22,8 +23,7 @@ git push origin main
         │
         ▼
 GitHub Actions (.github/workflows/)
-  ├── Build imagen frontend  →  ghcr.io/<org>/trad-ding-frontend:latest
-  └── Build imagen backend   →  ghcr.io/<org>/trad-ding-backend:latest
+  └── Build imagen frontend  →  ghcr.io/<org>/trad-ding/frontend:latest
         │
         ▼
 Dokploy webhook  →  docker pull + restart de servicios
@@ -37,8 +37,7 @@ El workflow se activa en cada push a `main`. Las imágenes se suben a GHCR (GitH
 
 | Servicio | Base image | Notas |
 |---|---|---|
-| Frontend (Next.js) | `node:22-slim` | Necesita Node >= 22 por `onnxruntime-node`. No usar Alpine (musl no compatible). |
-| Backend (FastAPI) | `python:3.12-slim` | No tiene `curl`; usar `python` para healthchecks. |
+| Next.js (único contenedor) | `node:22-slim` | Necesita Node >= 22 por `onnxruntime-node`. No usar Alpine (musl no compatible). |
 
 ### Build-time: variables de entorno dummy en el frontend
 
@@ -70,12 +69,16 @@ RUN npm run build
 
 Configuradas en Dokploy bajo el servicio correspondiente:
 
-| Variable | Servicio | Descripción |
-|---|---|---|
-| `SUPABASE_URL` | Frontend + Backend | URL del proyecto Supabase |
-| `SUPABASE_KEY` | Frontend + Backend | Service role key de Supabase |
-| `NEWS_API_KEY` | Backend | newsapi.org |
-| `GROQ_API_KEY` | Backend | console.groq.com (Llama 3.1) |
+| Variable | Descripción |
+|---|---|
+| `SUPABASE_URL` | URL del proyecto Supabase |
+| `SUPABASE_KEY` | Service role key de Supabase |
+| `NEWS_API_KEY` | newsapi.org |
+| `GROQ_API_KEY` | console.groq.com (Llama 3.1) |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis auth token |
+| `TRAIN_API_KEY` | Secreto compartido para POST /api/train + Modal |
+| `MODAL_TRAIN_URL` | URL del web endpoint de Modal para training |
 
 ---
 
@@ -125,15 +128,6 @@ echo "<GITHUB_TOKEN>" | docker login ghcr.io -u <GITHUB_USER> --password-stdin
 ```
 
 Hacer esto una sola vez; Docker guarda las credenciales en `~/.docker/config.json`.
-
-### Healthcheck falla en el backend
-
-`python:3.12-slim` no incluye `curl`. El healthcheck debe usar Python:
-
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-```
 
 ### Contenedor no levanta / error en logs
 
