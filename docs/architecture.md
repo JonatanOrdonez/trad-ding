@@ -305,7 +305,7 @@ GitHub Actions (build-and-push.yml)
 | **Registry** | GHCR | `ghcr.io/jonatanordonez/trad-ding/frontend:latest` |
 | **DB** | Supabase (hosted PostgreSQL) | Managed, no self-hosted DB |
 | **Cache** | Upstash Redis | Serverless Redis for response caching |
-| **ML training** | Modal | Serverless, triggered via backend `/train` |
+| **ML training** | Modal | Serverless, triggered via `POST /api/train` (Next.js Route Handler) |
 
 ### Environment variables
 

@@ -110,7 +110,7 @@ Configuradas en Dokploy bajo el servicio correspondiente:
 | `GROQ_API_KEY` | console.groq.com (Llama 3.1) |
 | `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis auth token |
-| `TRAIN_API_KEY` | Secreto compartido para POST /api/train + Modal |
+| `TRAIN_API_KEY` | Secreto compartido para `POST /api/train` + Modal auth |
 | `MODAL_TRAIN_URL` | URL del web endpoint de Modal para training |
 
 ---

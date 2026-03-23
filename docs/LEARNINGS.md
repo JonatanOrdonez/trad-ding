@@ -77,5 +77,8 @@ Verificar antes de agregar cualquier `COPY` en el Dockerfile que el directorio o
 El proyecto es un monolito Next.js. No hay backend Python separado.
 
 - Toda la lógica API (assets, news, predictions, training) vive en **Next.js Route Handlers** (`web/src/app/`).
+- La lógica de negocio está en **`web/src/lib/services/`** (`analysis.ts`, `news.ts`, `prediction.ts`, `supabase.ts`).
 - El training se orquesta desde `POST /api/train` (Next.js) → Modal web endpoint (Python serverless).
 - El código Python solo existe en `modal/` para la función de entrenamiento en Modal.
+
+Al agregar nuevos endpoints o modificar la lógica de la API, buscar en `web/src/app/` y `web/src/lib/services/`.

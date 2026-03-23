@@ -2,71 +2,48 @@
 
 Run the following steps to set up trad-ding on the local machine. Execute them sequentially and stop if any step fails.
 
+## Project structure
+
+The app is a single Next.js project under `web/`. There is no Python backend server.
+
+- **`web/`** — Next.js 15 app (frontend + API). All development work happens here.
+- **`modal/`** — Python code for ML training (deployed to Modal, not run locally).
+
 ## Steps
 
-### 1. Check Python version
-
-```bash
-python3 --version
-```
-
-The project requires **Python 3.12 or higher**. If missing:
-
-```bash
-brew install python@3.12
-```
-
-### 2. Create and activate virtual environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Confirm the venv is active — the prompt should show `(.venv)`.
-
-### 3. Install Python dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Check Node.js version
+### 1. Check Node.js version
 
 ```bash
 node --version
 npm --version
 ```
 
-The project requires **Node.js 18 or higher**. If missing:
+The project requires **Node.js 22 or higher** (`onnxruntime-node` requires Node 22+). If missing:
 
 ```bash
 brew install node
 ```
 
-### 5. Install Node.js dependencies
+### 2. Install Node.js dependencies
 
 ```bash
-npm install
+cd web && npm install
 ```
 
-### 6. Set up environment variables
+### 3. Set up environment variables
 
-Check if a `.env` file already exists:
+Copy the example file:
 
 ```bash
-ls -la .env
+cp web/.env.example web/.env.local
 ```
 
-If it does not exist, create it with the following template and fill in the values:
+Then fill in the values in `web/.env.local`:
 
 ```ini
-# PostgreSQL
-DB_USER=
-DB_PASSWORD=
-DB_HOST=
-DB_PORT=5432
-DB_NAME=
+# https://supabase.com/ (service role key)
+SUPABASE_URL=
+SUPABASE_KEY=
 
 # https://newsapi.org/
 NEWS_API_KEY=
@@ -74,46 +51,51 @@ NEWS_API_KEY=
 # https://console.groq.com/
 GROQ_API_KEY=
 
-# https://supabase.com/ (service role key)
-SUPABASE_URL=
-SUPABASE_KEY=
+# https://upstash.com/ (Redis REST)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# Shared secret for POST /api/train — generate with: openssl rand -hex 32
+TRAIN_API_KEY=
+
+# URL from `modal deploy modal/modal_app.py` output
+MODAL_TRAIN_URL=
 ```
 
-For Modal (optional, only needed for ML training):
+> The app will silently fail on API calls if any variable is missing. Check `web/.env.example` for descriptions.
+
+### 4. (Optional) Set up Modal for ML training
+
+If you need to run ML training locally:
 
 ```bash
+pip install modal
 modal token new
+modal deploy modal/modal_app.py
 ```
 
-### 7. Run database migrations
+Copy the web endpoint URL printed by `modal deploy` into `MODAL_TRAIN_URL` in `web/.env.local`.
+
+### 5. Verify the installation
+
+Start the dev server:
 
 ```bash
-make db-upgrade
-```
-
-This applies all Alembic migrations against the database configured in `.env`.
-
-### 8. Verify the installation
-
-Start both servers:
-
-```bash
-# Terminal 1
-make run
-# → http://localhost:8000
-
-# Terminal 2
-npm run dev
+cd web && npm run dev
 # → http://localhost:3000
 ```
 
-- Frontend: http://localhost:3000
-- API health check: http://localhost:8000/health
-- API docs: http://localhost:8000/docs
+Check the health endpoint:
+
+```bash
+curl http://localhost:3000/health
+# → {"status":"OK"}
+```
 
 ## Troubleshooting
 
-- **`RuntimeError: Environment variable 'X' is not set`** — a required variable is missing from `.env`. The backend fails fast on startup if any variable is absent.
-- **Database connection error** — verify PostgreSQL is running and the `DB_*` values in `.env` are correct.
-- **`modal: command not found`** — Modal is installed as part of `requirements.txt`. Make sure the venv is active.
-- **API calls fail from frontend** — make sure the backend is running on `:8000`; `next.config.js` proxies all API routes there.
+- **`Module not found` errors** — run `cd web && npm install` to make sure all dependencies are installed.
+- **API calls return errors** — verify all variables in `web/.env.local` are set. Missing `SUPABASE_URL` or `SUPABASE_KEY` will break most endpoints.
+- **`UPSTASH_REDIS_REST_URL` missing** — caching and training rate-limiting won't work. Create a free Upstash Redis database at https://upstash.com.
+- **`onnxruntime-node` fails to load** — make sure you're using Node 22+. Do not use Alpine Linux (use `node:22-slim` in Docker).
+- **`modal: command not found`** — install with `pip install modal` in a Python venv.
