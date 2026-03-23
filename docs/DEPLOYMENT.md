@@ -61,7 +61,40 @@ RUN npm run build
 |---|---|
 | Project ID | `pBxhlBCL1hu5paPYL90DG` |
 | Compose ID | `M1htexJlpnKvp5xeyr3BN` |
-| URL panel | https://dokploy.trad-ding.com (o la IP del servidor) |
+| URL panel | https://dokploy.astrolab.com.co |
+| Deploy webhook | `POST https://dokploy.astrolab.com.co/api/deploy/compose/755eJFwdVX0QWiVly_1Mj` |
+
+### Compose actualizado (monolito Next.js)
+
+El compose en Dokploy define un **único contenedor** (sin backend Python):
+
+```yaml
+services:
+  tradding-frontend:
+    image: ghcr.io/jonatanordonez/trad-ding/frontend:latest
+    pull_policy: always
+    restart: always
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      NEWS_API_KEY: ${NEWS_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      TRAIN_API_KEY: ${TRAIN_API_KEY}
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tradding-frontend.rule=Host(`trad-ding.com`) || Host(`www.trad-ding.com`) || Host(`api.trad-ding.com`)"
+      - "traefik.http.routers.tradding-frontend.entrypoints=websecure"
+      - "traefik.http.routers.tradding-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tradding-frontend.loadbalancer.server.port=3000"
+
+networks:
+  dokploy-network:
+    external: true
+```
+
+> **Importante:** `pull_policy: always` es obligatorio. Sin él, Docker reutiliza la imagen cacheada con tag `latest` y no baja la nueva versión.
 
 ---
 
@@ -82,13 +115,65 @@ Configuradas en Dokploy bajo el servicio correspondiente:
 
 ---
 
+## Endpoint de training (`POST /api/train`)
+
+El entrenamiento ML se dispara via HTTP, protegido por API key:
+
+```bash
+curl -X POST https://trad-ding.com/api/train \
+  -H "X-API-Key: <TRAIN_API_KEY>"
+```
+
+### Protecciones
+
+| Capa | Comportamiento | Requisito |
+|---|---|---|
+| **Auth** | Valida header `X-API-Key` contra env `TRAIN_API_KEY` | Siempre activa |
+| **Rate limit** | Máximo 1 ejecución cada 30 minutos | Requiere Upstash Redis |
+| **Concurrency lock** | Impide ejecución paralela | Requiere Upstash Redis |
+
+### Configurar TRAIN_API_KEY
+
+1. Generar una key segura:
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. Configurar en Dokploy via API:
+   ```bash
+   curl -X POST "https://dokploy.astrolab.com.co/api/compose.update" \
+     -H "x-api-key: <DOKPLOY_API_KEY>" \
+     -H "Content-Type: application/json" \
+     -d '{"composeId": "M1htexJlpnKvp5xeyr3BN", "env": "...todas las vars...\nTRAIN_API_KEY=<la key generada>"}'
+   ```
+
+   O desde el panel web de Dokploy → TradDing → Environment Variables.
+
+3. Redeploy para que tome efecto.
+
+### Flujo completo
+
+```
+POST /api/train (X-API-Key header)
+  → Auth check (403 si inválida)
+  → Rate limit check (429 si <30 min desde última ejecución)
+  → Concurrency lock (409 si ya hay uno corriendo)
+  → Para cada asset:
+      → Fetch 1 año de datos de Yahoo Finance
+      → Llama Modal web endpoint (XGBoost training)
+      → Guarda modelo en Supabase si mejoró o es >5 días antiguo
+  → Retorna resultados JSON
+```
+
+---
+
 ## Cómo hacer redeploy
 
 ### Via Dokploy API
 
 ```bash
-curl -X POST "https://<dokploy-host>/api/compose.redeploy" \
-  -H "Authorization: Bearer <DOKPLOY_API_KEY>" \
+curl -X POST "https://dokploy.astrolab.com.co/api/compose.deploy" \
+  -H "x-api-key: <DOKPLOY_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"composeId": "M1htexJlpnKvp5xeyr3BN"}'
 ```

@@ -1,6 +1,7 @@
 services:
   tradding-frontend:
     image: ghcr.io/jonatanordonez/trad-ding/frontend:latest
+    pull_policy: always
     restart: always
     environment:
       SUPABASE_URL: ${SUPABASE_URL}
