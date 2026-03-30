@@ -1,25 +1,86 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { typeBadgeClasses, cardTypeClass, actionStyleClasses, actionBarColor } from "@/lib/constants";
 import { timeAgo, scoreToPct } from "@/lib/utils";
-import { useChartSummary } from "@/hooks/useChartSummary";
 import type { Asset, LocalAnalysis } from "@/types/asset";
 
 const STALE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+const PERIOD_OPTIONS = [
+  { value: "1h", label: "1 hour" },
+  { value: "1d", label: "1 day" },
+  { value: "1w", label: "1 week" },
+  { value: "1m", label: "1 month" },
+  { value: "3m", label: "3 months" },
+  { value: "6m", label: "6 months" },
+  { value: "1y", label: "1 year" },
+];
+
 interface AssetCardProps {
   asset: Asset;
   localAnalysis: LocalAnalysis | null;
-  onAnalyze: (symbol: string) => void;
+  onAnalyze: (symbol: string, period?: string) => void;
   onShowNews: (symbol: string) => void;
   onDelete: (symbol: string) => void;
+}
+
+function AnalyzeDropdown({ onAnalyze }: { onAnalyze: (period?: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative flex-1 flex">
+      <button
+        type="button"
+        onClick={() => onAnalyze()}
+        className="cursor-pointer flex-1 min-h-[40px] bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium py-2 rounded-l-lg transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >
+        Analyze
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="cursor-pointer min-h-[40px] px-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white border-l border-indigo-500 rounded-r-lg transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        aria-label="Select analysis period"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 overflow-hidden">
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onAnalyze(opt.value); setOpen(false); }}
+              className="cursor-pointer w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AssetCard({ asset, localAnalysis, onAnalyze, onShowNews, onDelete }: AssetCardProps) {
   const styles = actionStyleClasses(localAnalysis?.action ?? null);
   const barColor = localAnalysis?.action ? actionBarColor(localAnalysis.action) : null;
   const isStale = localAnalysis ? Date.now() - localAnalysis.ts > STALE_MS : false;
-  const { latestRsi, priceChange7d } = useChartSummary(asset.symbol);
+  const latestRsi = localAnalysis?.latestRsi ?? null;
+  const priceChange7d = localAnalysis?.priceChange7d ?? null;
 
   const rsiColor =
     latestRsi !== null
@@ -101,13 +162,7 @@ export function AssetCard({ asset, localAnalysis, onAnalyze, onShowNews, onDelet
 
       {/* Primary actions */}
       <div className="flex gap-2 mt-auto">
-        <button
-          type="button"
-          onClick={() => onAnalyze(asset.symbol)}
-          className="cursor-pointer flex-1 min-h-[40px] bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium py-2 rounded-lg transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-        >
-          Analyze
-        </button>
+        <AnalyzeDropdown onAnalyze={(period) => onAnalyze(asset.symbol, period)} />
         <button
           type="button"
           onClick={() => onShowNews(asset.symbol)}

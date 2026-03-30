@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
+
+const yf = new YahooFinance();
 import { supabase } from "@/lib/services/supabase";
 
 export async function POST(req: NextRequest) {
@@ -36,12 +38,11 @@ export async function POST(req: NextRequest) {
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - 7);
-    const history = await yahooFinance.historical(
-      yfinance_symbol,
-      { period1: start, period2: end },
-      { validateResult: false }
-    ) as unknown[];
-    if (!history || history.length === 0) {
+    const chart = await yf.chart(yfinance_symbol, {
+      period1: start,
+      period2: end,
+    });
+    if (!chart.quotes || chart.quotes.length === 0) {
       return Response.json(
         { detail: `'${yfinance_symbol}' was not recognized by Yahoo Finance.` },
         { status: 422 }

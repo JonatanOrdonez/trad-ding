@@ -23,4 +23,6 @@ export interface LocalAnalysis {
   action: "BUY" | "SELL" | "HOLD";
   ts: number;
   score?: number;
+  latestRsi?: number | null;
+  priceChange7d?: number | null;
 }

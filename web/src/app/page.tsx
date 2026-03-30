@@ -27,9 +27,10 @@ import { useNews } from "@/hooks/useNews";
 import { useToast } from "@/hooks/useToast";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 
 // Lib
-import { loadAnalysis, saveAnalysis } from "@/lib/utils";
+import { loadAnalysis } from "@/lib/utils";
 import { syncNews as apiSyncNews } from "@/lib/api";
 
 // Types
@@ -65,6 +66,7 @@ function getCountsMap(assets: Asset[]): Record<string, number> {
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const { user, loading: authLoading, logout } = useAuth();
   const { dark, toggle: toggleTheme } = useTheme();
   const { assets, loading: assetsLoading, load, create, remove } = useAssets();
   const { analyze } = useAnalysis();
@@ -85,10 +87,17 @@ export default function DashboardPage() {
   // Refresh local analyses when assets change or refreshCounter bumps
   const localAnalyses = getLocalAnalyses(assets);
 
+  // ── Auth redirect ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!authLoading && !user) {
+      window.location.href = "/login";
+    }
+  }, [authLoading, user]);
+
   // ── Load on mount ───────────────────────────────────────────────────────────
   useEffect(() => {
-    load();
-  }, [load]);
+    if (user) load();
+  }, [user, load]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   useKeyboard({
@@ -97,10 +106,10 @@ export default function DashboardPage() {
   });
 
   // ── Analyze single asset ────────────────────────────────────────────────────
-  const handleAnalyze = useCallback(async (symbol: string) => {
+  const handleAnalyze = useCallback(async (symbol: string, period?: string) => {
     setPanel({ type: "analysis-loading", symbol });
     try {
-      const result = await analyze(symbol);
+      const result = await analyze(symbol, period);
       setPanel({ type: "analysis", symbol, data: result });
       setRefreshCounter((c) => c + 1);
     } catch (e) {
@@ -120,8 +129,7 @@ export default function DashboardPage() {
     let failed = 0;
     for (const asset of assets) {
       try {
-        const result = await analyze(asset.symbol);
-        saveAnalysis(asset.symbol, result.action, result.score);
+        await analyze(asset.symbol);
         done++;
       } catch {
         failed++;
@@ -276,6 +284,15 @@ export default function DashboardPage() {
   const isEmpty = assets.length === 0 && !assetsLoading;
   const noMatch = visible.length === 0 && assets.length > 0;
 
+  // Wait for auth before rendering
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Header */}
@@ -285,6 +302,8 @@ export default function DashboardPage() {
         onAnalyzeAll={handleAnalyzeAll}
         isDark={dark}
         onToggleTheme={toggleTheme}
+        user={user}
+        onLogout={logout}
       />
 
       {/* Signal summary strip */}

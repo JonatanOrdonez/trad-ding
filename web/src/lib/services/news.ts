@@ -86,7 +86,7 @@ type YahooNewsItem = {
   providerPublishTime?: Date | number;
 };
 
-async function syncYahooNewsForAsset(asset: DbAsset): Promise<void> {
+export async function syncYahooNewsForAsset(asset: DbAsset): Promise<void> {
   let news: YahooNewsItem[] = [];
   try {
     const result = await yf.search(asset.yfinance_symbol, {
