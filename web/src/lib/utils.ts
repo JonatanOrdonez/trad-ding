@@ -17,9 +17,19 @@ export function loadAnalysis(symbol: string): LocalAnalysis | null {
   }
 }
 
-export function saveAnalysis(symbol: string, action: Signal, score?: number): void {
+export function saveAnalysis(
+  symbol: string,
+  action: Signal,
+  score?: number,
+  chartData?: { latestRsi: number | null; priceChange7d: number | null },
+): void {
   if (typeof window === "undefined") return;
-  const data: LocalAnalysis = { action, ts: Date.now(), ...(score !== undefined && { score }) };
+  const data: LocalAnalysis = {
+    action,
+    ts: Date.now(),
+    ...(score !== undefined && { score }),
+    ...(chartData && { latestRsi: chartData.latestRsi, priceChange7d: chartData.priceChange7d }),
+  };
   localStorage.setItem(`${LS_PREFIX}${symbol}`, JSON.stringify(data));
 }
 

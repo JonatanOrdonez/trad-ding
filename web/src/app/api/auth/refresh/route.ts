@@ -1,0 +1,33 @@
+import { NextRequest } from "next/server";
+import { supabase } from "@/lib/services/supabase";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { refresh_token } = await req.json();
+
+    if (!refresh_token) {
+      return Response.json({ detail: "refresh_token is required" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+
+    if (error || !data.session) {
+      return Response.json({ detail: error?.message ?? "Failed to refresh session" }, { status: 401 });
+    }
+
+    const user = data.user!;
+    return Response.json({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at,
+      user: {
+        id: user.id,
+        email: user.email,
+        userName: user.user_metadata?.userName ?? "",
+        role: user.user_metadata?.role ?? "user",
+      },
+    });
+  } catch {
+    return Response.json({ detail: "Refresh failed" }, { status: 500 });
+  }
+}

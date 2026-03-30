@@ -27,8 +27,9 @@ export function deleteAsset(symbol: string): Promise<unknown> {
   return request(`/assets/${symbol}`, { method: "DELETE" });
 }
 
-export function fetchAnalysis(symbol: string): Promise<AssetAnalysis> {
-  return request<AssetAnalysis>(`/predictions/${symbol}`);
+export function fetchAnalysis(symbol: string, period?: string): Promise<AssetAnalysis> {
+  const params = period ? `?period=${period}` : "";
+  return request<AssetAnalysis>(`/predictions/${symbol}${params}`);
 }
 
 export function fetchNews(symbol: string, offset: number, limit: number): Promise<NewsResponse> {

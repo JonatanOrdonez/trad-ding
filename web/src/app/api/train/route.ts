@@ -1,14 +1,8 @@
 import { NextRequest } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { supabase } from "@/lib/services/supabase";
-import { getCached, setCached } from "@/lib/cache";
 
 const yf = new YahooFinance();
-
-const RATE_LIMIT_KEY = "train:rate-limit";
-const LOCK_KEY = "train:lock";
-const RATE_LIMIT_TTL = 1800; // 30 minutes
-const LOCK_TTL = 600; // 10 minutes max lock
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -19,32 +13,11 @@ function validateApiKey(req: NextRequest): boolean {
   return key === expected;
 }
 
-// ── Redis lock helpers (using Upstash via cache module) ──────────────────────
-
-async function acquireLock(): Promise<boolean> {
-  // Use getCached to check if lock exists
-  const existing = await getCached<string>(LOCK_KEY);
-  if (existing) return false;
-  // Set lock with TTL
-  await setCached(LOCK_KEY, "locked", LOCK_TTL);
-  return true;
-}
-
-async function releaseLock(): Promise<void> {
-  // Import Redis directly to use del
-  const { Redis } = await import("@upstash/redis");
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return;
-  const redis = new Redis({ url, token });
-  await redis.del(LOCK_KEY);
-}
-
 // ── Train a single asset ─────────────────────────────────────────────────────
 
 interface TrainResult {
   symbol: string;
-  improved: boolean;
+  saved: boolean;
   error?: string;
   metrics?: { balanced_accuracy: number; roc_auc: number };
 }
@@ -52,30 +25,29 @@ interface TrainResult {
 async function trainAsset(
   assetId: string,
   symbol: string,
-  yfinanceSymbol: string
+  yfinanceSymbol: string,
 ): Promise<TrainResult> {
   const modalUrl = process.env.MODAL_TRAIN_URL;
   const trainApiKey = process.env.TRAIN_API_KEY;
   if (!modalUrl) throw new Error("MODAL_TRAIN_URL is not set");
 
-  // Fetch existing active model
-  const { data: existingModel } = await supabase
-    .from("asset_models")
-    .select("id, metrics, created_at")
-    .eq("asset_id", assetId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  // Fetch 1 year of price history
+  // Fetch 3 years of price history
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setFullYear(startDate.getFullYear() - 1);
+  startDate.setFullYear(startDate.getFullYear() - 3);
 
-  const history = await yf.historical(
-    yfinanceSymbol,
-    { period1: startDate, period2: endDate },
-    { validateResult: false }
-  ) as Array<{ date: Date; close: number; open: number; high: number; low: number; volume: number }>;
+  console.log(`[train] ${symbol} fetching price history...`);
+  const history = (await yf.chart(yfinanceSymbol, {
+    period1: startDate,
+    period2: endDate,
+  })).quotes as Array<{
+    date: Date;
+    close: number;
+    open: number;
+    high: number;
+    low: number;
+    volume: number;
+  }>;
 
   const records = history
     .filter((h) => h.close !== null)
@@ -89,10 +61,10 @@ async function trainAsset(
     }));
 
   if (records.length < 60) {
-    return { symbol, improved: false, error: "Not enough historical data" };
+    return { symbol, saved: false, error: "Not enough historical data" };
   }
 
-  // Call Modal web endpoint
+  console.log(`[train] ${symbol} sending ${records.length} records to Modal...`);
   const modalRes = await fetch(modalUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -101,111 +73,104 @@ async function trainAsset(
 
   if (!modalRes.ok) {
     const text = await modalRes.text();
-    return { symbol, improved: false, error: `Modal error: ${text}` };
+    return { symbol, saved: false, error: `Modal error: ${text}` };
   }
 
-  const result = await modalRes.json() as {
+  const result = (await modalRes.json()) as {
     error?: string;
     metrics?: { balanced_accuracy: number; roc_auc: number };
     storage_path?: string;
   };
 
   if (result.error) {
-    return { symbol, improved: false, error: result.error };
+    return { symbol, saved: false, error: result.error };
   }
 
-  const rocAuc = result.metrics!.roc_auc;
+  // Always save — training runs weekly, always replace with fresh model
+  console.log(`[train] ${symbol} saving model. storage_path=${result.storage_path}`);
 
-  // Decide whether to save the new model
-  let shouldSave = true;
-  if (existingModel) {
-    const existingRocAuc = (existingModel.metrics as Record<string, number>)?.roc_auc ?? 0;
-    const improved = rocAuc > existingRocAuc;
-    const createdAt = new Date(existingModel.created_at);
-    const stale = Date.now() - createdAt.getTime() > 5 * 24 * 60 * 60 * 1000; // 5 days
-    shouldSave = improved || stale;
-  }
-
-  if (!shouldSave) {
-    return { symbol, improved: false, metrics: result.metrics };
-  }
-
-  // Deactivate existing models and save new one
   await supabase
     .from("asset_models")
     .update({ is_active: false })
     .eq("asset_id", assetId);
 
-  await supabase.from("asset_models").insert({
+  const { error: insertErr } = await supabase.from("asset_models").insert({
     asset_id: assetId,
     storage_path: result.storage_path,
     metrics: result.metrics,
+    features: {
+      period: "3y",
+      features: [
+        "sma_ratio",
+        "price_to_sma20",
+        "rsi",
+        "rsi_change",
+        "macd_hist",
+        "bb_position",
+        "atr_ratio",
+        "volume_ratio",
+        "obv_change",
+        "price_change",
+        "price_change_5d",
+        "high_low_range",
+        "trend_strength",
+        "vol_regime",
+        "mean_rev_dist",
+        "rsi_zone",
+        "consecutive_up",
+      ],
+    },
     is_active: true,
   });
 
-  return { symbol, improved: true, metrics: result.metrics };
+  if (insertErr) {
+    console.log(`[train] ${symbol} insert error=`, insertErr);
+    return { symbol, saved: false, error: insertErr.message };
+  }
+
+  console.log(`[train] ${symbol} done. roc_auc=${result.metrics?.roc_auc}`);
+  return { symbol, saved: true, metrics: result.metrics };
 }
 
 // ── Route Handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // 1. Auth
   if (!validateApiKey(req)) {
     return Response.json({ detail: "Forbidden" }, { status: 403 });
   }
 
-  // 2. Rate limit
-  const lastRun = await getCached<string>(RATE_LIMIT_KEY);
-  if (lastRun) {
-    return Response.json(
-      { detail: "Rate limited. Max 1 training every 30 minutes." },
-      { status: 429 }
-    );
+  const body = await req.json().catch(() => ({}));
+  const filterSymbols: string[] | undefined = body.symbols;
+
+  let query = supabase.from("assets").select("id, symbol, yfinance_symbol");
+  if (filterSymbols?.length) {
+    query = query.in("symbol", filterSymbols.map((s: string) => s.toUpperCase()));
   }
 
-  // 3. Concurrency lock
-  const acquired = await acquireLock();
-  if (!acquired) {
-    return Response.json(
-      { detail: "Training already in progress." },
-      { status: 409 }
-    );
+  const { data: assets } = await query;
+
+  if (!assets || assets.length === 0) {
+    return Response.json({ results: [] });
   }
 
-  try {
-    // 4. Get all assets
-    const { data: assets } = await supabase
-      .from("assets")
-      .select("id, symbol, yfinance_symbol");
-
-    if (!assets || assets.length === 0) {
-      return Response.json({ results: [] });
-    }
-
-    // 5. Train sequentially (avoid overloading Modal)
-    const results: TrainResult[] = [];
-    for (const asset of assets) {
+  // Train all assets in parallel
+  const results = await Promise.all(
+    assets.map(async (asset): Promise<TrainResult> => {
       try {
-        const result = await trainAsset(
+        return await trainAsset(
           asset.id as string,
           asset.symbol as string,
-          asset.yfinance_symbol as string
+          asset.yfinance_symbol as string,
         );
-        results.push(result);
       } catch (e) {
-        results.push({
+        return {
           symbol: asset.symbol as string,
-          improved: false,
+          saved: false,
           error: e instanceof Error ? e.message : "Unknown error",
-        });
+        };
       }
-    }
+    }),
+  );
 
-    // 6. Set rate limit after successful completion
-    await setCached(RATE_LIMIT_KEY, new Date().toISOString(), RATE_LIMIT_TTL);
-
-    return Response.json({ results });
-  } finally {
-    await releaseLock();
-  }
+  return Response.json({ results });
 }
