@@ -32,6 +32,8 @@ export function AssetsTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<DbAsset>>({});
   const [saving, setSaving] = useState(false);
+  const [deletingSymbol, setDeletingSymbol] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>("symbol");
@@ -79,6 +81,25 @@ export function AssetsTab() {
       alert("Failed to update asset");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (symbol: string) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/assets/${symbol}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { const d = await res.json(); alert(d.detail ?? "Failed to delete"); return; }
+      setAssets((prev) => prev.filter((a) => a.symbol !== symbol));
+      setDeletingSymbol(null);
+    } catch {
+      alert("Failed to delete asset");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -194,10 +215,16 @@ export function AssetsTab() {
                       <td className="py-2.5 pr-3 text-xs text-gray-500">{a.yfinance_symbol}</td>
                       <td className="py-2.5 pr-3 text-xs text-gray-500">{new Date(a.created_at).toLocaleDateString()}</td>
                       <td className="py-2.5 whitespace-nowrap">
-                        <button type="button" onClick={() => startEdit(a)}
-                          className="cursor-pointer text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                          Edit
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => startEdit(a)}
+                            className="cursor-pointer text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => setDeletingSymbol(a.symbol)}
+                            className="cursor-pointer text-[10px] font-medium text-red-500 hover:underline">
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </>
                   )}
@@ -206,6 +233,37 @@ export function AssetsTab() {
             </tbody>
           </table>
           {sorted.length === 0 && <p className="text-sm text-gray-500 text-center py-8">No assets found.</p>}
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deletingSymbol && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40" onClick={() => !deleting && setDeletingSymbol(null)} />
+          <div className="relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-base font-semibold mb-2">Delete {deletingSymbol}?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+              This will permanently delete the asset, its models, and all associated news. This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeletingSymbol(null)}
+                disabled={deleting}
+                className="cursor-pointer min-h-[40px] px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(deletingSymbol)}
+                disabled={deleting}
+                className="cursor-pointer min-h-[40px] px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-red-400 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

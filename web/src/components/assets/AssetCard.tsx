@@ -22,7 +22,6 @@ interface AssetCardProps {
   localAnalysis: LocalAnalysis | null;
   onAnalyze: (symbol: string, period?: string) => void;
   onShowNews: (symbol: string) => void;
-  onDelete: (symbol: string) => void;
 }
 
 function AnalyzeDropdown({ onAnalyze }: { onAnalyze: (period?: string) => void }) {
@@ -75,7 +74,7 @@ function AnalyzeDropdown({ onAnalyze }: { onAnalyze: (period?: string) => void }
   );
 }
 
-export function AssetCard({ asset, localAnalysis, onAnalyze, onShowNews, onDelete }: AssetCardProps) {
+export function AssetCard({ asset, localAnalysis, onAnalyze, onShowNews }: AssetCardProps) {
   const styles = actionStyleClasses(localAnalysis?.action ?? null);
   const barColor = localAnalysis?.action ? actionBarColor(localAnalysis.action) : null;
   const isStale = localAnalysis ? Date.now() - localAnalysis.ts > STALE_MS : false;
@@ -172,24 +171,7 @@ export function AssetCard({ asset, localAnalysis, onAnalyze, onShowNews, onDelet
         </button>
       </div>
 
-      {/* Delete */}
-      <div className="border-t border-gray-200/80 dark:border-gray-800/80 pt-2.5 -mx-5 px-5 -mb-1">
-        <button
-          type="button"
-          onClick={() => {
-            if (confirm(`Delete ${asset.symbol} and all its news and ML models?`)) {
-              onDelete(asset.symbol);
-            }
-          }}
-          aria-label={`Delete ${asset.symbol}`}
-          className="cursor-pointer w-full flex items-center justify-center gap-2 min-h-[32px] text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 rounded-lg px-3 py-1.5 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-        >
-          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" />
-          </svg>
-          Delete
-        </button>
-      </div>
+
     </div>
   );
 }

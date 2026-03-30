@@ -68,7 +68,7 @@ function getCountsMap(assets: Asset[]): Record<string, number> {
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const { dark, toggle: toggleTheme } = useTheme();
-  const { assets, loading: assetsLoading, load, create, remove } = useAssets();
+  const { assets, loading: assetsLoading, load, create } = useAssets();
   const { analyze } = useAnalysis();
   const { items: newsItems, offset: newsOffset, loading: newsLoading, error: newsError, load: loadNews, hasMore, hasPrev } = useNews();
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
@@ -166,18 +166,6 @@ export default function DashboardPage() {
     }
   }, [showToast]);
 
-  // ── Delete asset ────────────────────────────────────────────────────────────
-  const handleDelete = useCallback(async (symbol: string) => {
-    setLoaderMessage(`Deleting ${symbol}...`);
-    try {
-      await remove(symbol);
-      setLoaderMessage(null);
-      showToast(`${symbol} deleted.`, "info");
-    } catch (e) {
-      setLoaderMessage(null);
-      showToast(e instanceof Error ? e.message : "Delete failed.", "error");
-    }
-  }, [remove, showToast]);
 
   // ── Create asset ────────────────────────────────────────────────────────────
   const handleCreate = useCallback(async (data: CreateAssetRequest) => {
@@ -394,7 +382,6 @@ export default function DashboardPage() {
                 localAnalysis={localAnalyses[asset.symbol] ?? null}
                 onAnalyze={handleAnalyze}
                 onShowNews={handleShowNews}
-                onDelete={handleDelete}
               />
             ))}
         </div>
